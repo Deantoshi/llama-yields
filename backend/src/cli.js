@@ -1,0 +1,226 @@
+import {
+  CHART_URL,
+  DEFAULT_DB,
+  POOLS_URL,
+  fetchJson,
+  ingestHistory,
+  initDb,
+  listPools,
+  normalizeCategory,
+  openDb,
+  recomputeMetrics,
+  upsertPools,
+} from "./db.js";
+
+function parseArgs(argv) {
+  const result = { _: [] };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg.startsWith("--")) {
+      const key = arg.slice(2);
+      const next = argv[i + 1];
+      if (next && !next.startsWith("--")) {
+        result[key] = next;
+        i += 1;
+      } else {
+        result[key] = true;
+      }
+    } else {
+      result._.push(arg);
+    }
+  }
+  return result;
+}
+
+function toInt(value, fallback = null) {
+  if (value == null) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function printUsage() {
+  console.log(`Usage: node src/cli.js <command> [options]
+
+Commands:
+  init-db
+  ingest-pools
+  ingest-history
+  recompute-metrics
+  sync
+  read
+
+Options:
+  --db <path>
+  --category <Stablecoins|ETH|BTC|Other>
+  --pool-id <poolId>
+  --limit <n>
+  --window-days <n>
+  --verbose
+`);
+}
+
+async function cmdInitDb(args) {
+  const db = openDb(args.db || DEFAULT_DB);
+  initDb(db);
+  db.close();
+  console.log(`Initialized database at ${args.db || DEFAULT_DB}`);
+}
+
+async function cmdIngestPools(args) {
+  const data = await fetchJson(POOLS_URL);
+  const pools = Array.isArray(data) ? data : data?.data || [];
+  const db = openDb(args.db || DEFAULT_DB);
+  initDb(db);
+  upsertPools(db, pools);
+  db.close();
+  console.log(`Upserted ${pools.length} pools`);
+}
+
+async function cmdIngestHistory(args) {
+  const db = openDb(args.db || DEFAULT_DB);
+  initDb(db);
+
+  let poolIds = [];
+  if (args["pool-id"]) {
+    poolIds = [args["pool-id"]];
+  } else {
+    const category = normalizeCategory(args.category);
+    if (category) {
+      poolIds = db
+        .prepare("SELECT pool_id FROM pools WHERE category = ?")
+        .all(category)
+        .map((row) => row.pool_id);
+    } else {
+      poolIds = db
+        .prepare("SELECT pool_id FROM pools")
+        .all()
+        .map((row) => row.pool_id);
+    }
+
+    const limit = toInt(args.limit, null);
+    if (limit) {
+      poolIds = poolIds.slice(0, limit);
+    }
+  }
+
+  for (let i = 0; i < poolIds.length; i += 1) {
+    const pid = poolIds[i];
+    const chart = await fetchJson(CHART_URL.replace("{}", pid));
+    const data = Array.isArray(chart) ? chart : chart?.data || [];
+    ingestHistory(db, pid, data);
+    if (args.verbose) {
+      console.log(`[${i + 1}/${poolIds.length}] Ingested history for ${pid}`);
+    }
+  }
+
+  db.close();
+  console.log("History ingestion complete");
+}
+
+async function cmdRecomputeMetrics(args) {
+  const db = openDb(args.db || DEFAULT_DB);
+  initDb(db);
+  recomputeMetrics(db, {
+    poolId: args["pool-id"] || null,
+    windowDays: toInt(args["window-days"], 90),
+  });
+  db.close();
+  console.log("Metrics updated");
+}
+
+async function cmdSync(args) {
+  const data = await fetchJson(POOLS_URL);
+  const pools = Array.isArray(data) ? data : data?.data || [];
+
+  const db = openDb(args.db || DEFAULT_DB);
+  initDb(db);
+  upsertPools(db, pools);
+
+  const category = normalizeCategory(args.category);
+  let poolIds = [];
+  if (category) {
+    poolIds = db
+      .prepare("SELECT pool_id FROM pools WHERE category = ?")
+      .all(category)
+      .map((row) => row.pool_id);
+  } else {
+    poolIds = db
+      .prepare("SELECT pool_id FROM pools")
+      .all()
+      .map((row) => row.pool_id);
+  }
+
+  const limit = toInt(args.limit, null);
+  if (limit) {
+    poolIds = poolIds.slice(0, limit);
+  }
+
+  for (let i = 0; i < poolIds.length; i += 1) {
+    const pid = poolIds[i];
+    const chart = await fetchJson(CHART_URL.replace("{}", pid));
+    const chartData = Array.isArray(chart) ? chart : chart?.data || [];
+    ingestHistory(db, pid, chartData);
+    if (args.verbose) {
+      console.log(`[${i + 1}/${poolIds.length}] Ingested history for ${pid}`);
+    }
+  }
+
+  recomputeMetrics(db, {
+    windowDays: toInt(args["window-days"], 90),
+  });
+  db.close();
+  console.log("Sync complete");
+}
+
+async function cmdRead(args) {
+  const db = openDb(args.db || DEFAULT_DB);
+  initDb(db);
+  const category = normalizeCategory(args.category || "Stablecoins");
+  const limit = toInt(args.limit, 25);
+  const rows = listPools(db, category, limit);
+  db.close();
+  console.log(
+    JSON.stringify({ category, count: rows.length, data: rows }, null, 2)
+  );
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const command = args._[0];
+
+  if (!command) {
+    printUsage();
+    process.exit(1);
+  }
+
+  switch (command) {
+    case "init-db":
+      await cmdInitDb(args);
+      break;
+    case "ingest-pools":
+      await cmdIngestPools(args);
+      break;
+    case "ingest-history":
+      await cmdIngestHistory(args);
+      break;
+    case "recompute-metrics":
+      await cmdRecomputeMetrics(args);
+      break;
+    case "sync":
+      await cmdSync(args);
+      break;
+    case "read":
+      await cmdRead(args);
+      break;
+    default:
+      printUsage();
+      process.exit(1);
+  }
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
