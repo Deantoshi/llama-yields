@@ -274,6 +274,123 @@ button:hover {
   font-weight: 600;
 }
 
+.chart-section {
+  display: grid;
+  gap: 16px;
+}
+
+.chart-header h3 {
+  margin: 0 0 6px;
+  font-family: "Fraunces", "Times New Roman", serif;
+  font-size: 1.4rem;
+}
+
+.chart-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.chart-wrap {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pie-chart {
+  width: 100%;
+  height: 100%;
+}
+
+.pie-slice {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  transform-origin: 50% 50%;
+}
+
+.pie-slice:hover {
+  transform: scale(1.02);
+}
+
+.chart-empty {
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  text-align: center;
+  color: var(--muted);
+  background: rgba(8, 12, 17, 0.35);
+}
+
+.chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  transform: translate(-50%, -110%);
+  background: rgba(9, 13, 18, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+  min-width: 160px;
+}
+
+.tooltip-title {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.tooltip-value {
+  display: block;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.pie-legend {
+  display: grid;
+  gap: 12px;
+}
+
+.legend-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(8, 12, 17, 0.5);
+}
+
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
+}
+
+.legend-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.legend-title {
+  font-weight: 600;
+}
+
+.legend-sub {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .allocation-header,
 .allocation-row {
   display: grid;
@@ -385,6 +502,16 @@ button:hover {
   .allocation-row {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-wrap {
+    width: 100%;
+    max-width: 280px;
+    margin: 0 auto;
   }
 }
 

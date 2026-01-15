@@ -1,7 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { Pool } from "./types";
 
 const CATEGORIES = ["Stablecoins", "ETH", "BTC"] as const;
+const PIE_COLORS = [
+  "#ff8f3d",
+  "#2ab3a6",
+  "#f1c453",
+  "#e4572e",
+  "#59c3c3",
+  "#f3d34a",
+  "#f79d65",
+  "#7bdff2",
+  "#fbb13c",
+];
 
 type Category = (typeof CATEGORIES)[number];
 
@@ -23,6 +34,10 @@ function formatPercent(value: number | null, digits = 2) {
   return `${value.toFixed(digits)}%`;
 }
 
+function formatNumber(value: number) {
+  return value.toLocaleString("en-US");
+}
+
 function predictedApy(pool: Pool, allocation: number) {
   if (pool.apy == null) {
     return null;
@@ -32,17 +47,57 @@ function predictedApy(pool: Pool, allocation: number) {
   return Math.max(0, predicted);
 }
 
+function describeArc(
+  cx: number,
+  cy: number,
+  radius: number,
+  startAngle: number,
+  endAngle: number
+) {
+  const start = polarToCartesian(cx, cy, radius, endAngle);
+  const end = polarToCartesian(cx, cy, radius, startAngle);
+  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+  return [
+    `M ${cx} ${cy}`,
+    `L ${start.x} ${start.y}`,
+    `A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`,
+    "Z",
+  ].join(" ");
+}
+
+function polarToCartesian(
+  cx: number,
+  cy: number,
+  radius: number,
+  angleInDegrees: number
+) {
+  const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
+  return {
+    x: cx + radius * Math.cos(angleInRadians),
+    y: cy + radius * Math.sin(angleInRadians),
+  };
+}
+
 function App() {
   const [category, setCategory] = useState<Category>("Stablecoins");
   const [pools, setPools] = useState<Pool[]>([]);
   const [selectedPools, setSelectedPools] = useState<Pool[]>([]);
   const [allocations, setAllocations] = useState<Record<string, number>>({});
   const [investment, setInvestment] = useState(100000);
+  const [investmentDisplay, setInvestmentDisplay] = useState(
+    formatNumber(100000)
+  );
   const [splits, setSplits] = useState(6);
   const [impactPoolId, setImpactPoolId] = useState<string | null>(null);
   const [impactAmount, setImpactAmount] = useState(25000);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tooltip, setTooltip] = useState<{
+    x: number;
+    y: number;
+    title: string;
+    value: string;
+  } | null>(null);
 
   const recomputeSelection = useCallback(() => {
     if (!pools.length) {
@@ -178,6 +233,69 @@ function App() {
       ? impactPredicted - impactCurrent
       : null;
 
+  const chartSlices = useMemo(() => {
+    if (totalAllocated <= 0) {
+      return [];
+    }
+    let startAngle = 0;
+    return selectedPools
+      .map((pool, index) => {
+        const allocation = allocations[pool.pool_id] || 0;
+        if (allocation <= 0) {
+          return null;
+        }
+        const weight = allocation / totalAllocated;
+        const angle = weight * 360;
+        const endAngle = startAngle + angle;
+        const predicted = predictedApy(pool, allocation);
+        const expectedYield =
+          predicted != null ? (predicted / 100) * allocation : null;
+        const slice = {
+          pool,
+          allocation,
+          weight,
+          predicted,
+          expectedYield,
+          startAngle,
+          endAngle,
+          color: PIE_COLORS[index % PIE_COLORS.length],
+        };
+        startAngle = endAngle;
+        return slice;
+      })
+      .filter(Boolean) as Array<{
+      pool: Pool;
+      allocation: number;
+      weight: number;
+      predicted: number | null;
+      expectedYield: number | null;
+      startAngle: number;
+      endAngle: number;
+      color: string;
+    }>;
+  }, [allocations, selectedPools, totalAllocated]);
+
+  const handleSliceHover = (
+    slice: (typeof chartSlices)[number],
+    event: React.MouseEvent<SVGPathElement | SVGCircleElement>
+  ) => {
+    const wrapper = (event.currentTarget as Element).closest(".chart-wrap");
+    if (!wrapper) {
+      return;
+    }
+    const rect = (wrapper as HTMLElement).getBoundingClientRect();
+    const expected = slice.expectedYield;
+    setTooltip({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      title: `${slice.pool.project} - ${slice.pool.symbol}`,
+      value:
+        expected == null
+          ? "Expected yield: --"
+          : `Expected yield: ${formatCurrency(expected)}`,
+    });
+  };
+
   return (
     <div>
       <div className="backdrop" aria-hidden="true">
@@ -241,13 +359,23 @@ function App() {
                 <span>Total investment (USD)</span>
                 <input
                   id="investment"
-                  type="number"
-                  min="0"
-                  step="100"
-                  value={investment}
-                  onChange={(event) =>
-                    setInvestment(Number(event.target.value) || 0)
-                  }
+                  type="text"
+                  inputMode="numeric"
+                  value={investmentDisplay}
+                  onChange={(event) => {
+                    const raw = event.target.value.replace(/[^\d]/g, "");
+                    if (!raw) {
+                      setInvestment(0);
+                      setInvestmentDisplay("");
+                      return;
+                    }
+                    const nextValue = Number(raw);
+                    setInvestment(nextValue);
+                    setInvestmentDisplay(formatNumber(nextValue));
+                  }}
+                  onBlur={() => {
+                    setInvestmentDisplay(formatNumber(investment));
+                  }}
                 />
               </label>
               <label className="control">
@@ -366,6 +494,95 @@ function App() {
                     </div>
                   );
                 })}
+            </div>
+
+            <div className="chart-section">
+              <div className="chart-header">
+                <h3>Allocation Mix</h3>
+                <p>Hover a slice to see expected yield per allocation.</p>
+              </div>
+              <div className="chart-grid">
+                <div
+                  className="chart-wrap"
+                  onMouseLeave={() => setTooltip(null)}
+                >
+                  {totalAllocated > 0 ? (
+                    <svg
+                      className="pie-chart"
+                      viewBox="0 0 200 200"
+                      role="img"
+                      aria-label="Allocation pie chart"
+                    >
+                      {chartSlices.length === 1 ? (
+                        <circle
+                          className="pie-slice"
+                          cx="100"
+                          cy="100"
+                          r="90"
+                          fill={chartSlices[0].color}
+                          onMouseMove={(event) =>
+                            handleSliceHover(chartSlices[0], event)
+                          }
+                        />
+                      ) : (
+                        chartSlices.map((slice) => (
+                          <path
+                            key={slice.pool.pool_id}
+                            className="pie-slice"
+                            d={describeArc(
+                              100,
+                              100,
+                              90,
+                              slice.startAngle,
+                              slice.endAngle
+                            )}
+                            fill={slice.color}
+                            onMouseMove={(event) =>
+                              handleSliceHover(slice, event)
+                            }
+                          />
+                        ))
+                      )}
+                    </svg>
+                  ) : (
+                    <div className="chart-empty">
+                      Allocate capital to see the mix.
+                    </div>
+                  )}
+                  {tooltip && (
+                    <div
+                      className="chart-tooltip"
+                      style={{ left: tooltip.x, top: tooltip.y }}
+                    >
+                      <span className="tooltip-title">{tooltip.title}</span>
+                      <span className="tooltip-value">{tooltip.value}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="pie-legend">
+                  {chartSlices.map((slice) => (
+                    <div className="legend-row" key={slice.pool.pool_id}>
+                      <span
+                        className="legend-swatch"
+                        style={{ backgroundColor: slice.color }}
+                        aria-hidden="true"
+                      ></span>
+                      <div className="legend-meta">
+                        <span className="legend-title">
+                          {slice.pool.project} - {slice.pool.symbol}
+                        </span>
+                        <span className="legend-sub">
+                          {formatPercent(slice.weight * 100, 1)} ·{" "}
+                          {formatCurrency(slice.allocation)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {!chartSlices.length && (
+                    <div className="legend-row">No allocation data yet.</div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </section>
