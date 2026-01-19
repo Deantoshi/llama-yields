@@ -1,6 +1,7 @@
 import {
   CHART_URL,
   DEFAULT_DB,
+  PROTOCOLS_URL,
   POOLS_URL,
   fetchJson,
   ingestHistory,
@@ -10,6 +11,7 @@ import {
   openDb,
   recomputeMetrics,
   upsertPools,
+  upsertProtocols,
 } from "./db.js";
 
 function parseArgs(argv) {
@@ -71,11 +73,14 @@ async function cmdInitDb(args) {
 async function cmdIngestPools(args) {
   const data = await fetchJson(POOLS_URL);
   const pools = Array.isArray(data) ? data : data?.data || [];
+  const protocolData = await fetchJson(PROTOCOLS_URL);
+  const protocols = Array.isArray(protocolData) ? protocolData : [];
   const db = openDb(args.db || DEFAULT_DB);
   initDb(db);
+  upsertProtocols(db, protocols);
   upsertPools(db, pools);
   db.close();
-  console.log(`Upserted ${pools.length} pools`);
+  console.log(`Upserted ${pools.length} pools and ${protocols.length} protocols`);
 }
 
 async function cmdIngestHistory(args) {
@@ -133,9 +138,12 @@ async function cmdRecomputeMetrics(args) {
 async function cmdSync(args) {
   const data = await fetchJson(POOLS_URL);
   const pools = Array.isArray(data) ? data : data?.data || [];
+  const protocolData = await fetchJson(PROTOCOLS_URL);
+  const protocols = Array.isArray(protocolData) ? protocolData : [];
 
   const db = openDb(args.db || DEFAULT_DB);
   initDb(db);
+  upsertProtocols(db, protocols);
   upsertPools(db, pools);
 
   const category = normalizeCategory(args.category);

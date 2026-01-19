@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 
 export const POOLS_URL = "https://yields.llama.fi/pools";
+export const PROTOCOLS_URL = "https://api.llama.fi/protocols";
 export const CHART_URL = "https://yields.llama.fi/chart/{}";
 
 const ROOT_DIR = path.resolve(
@@ -180,7 +181,51 @@ export function initDb(db) {
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (pool_id) REFERENCES pools(pool_id)
     );
+
+    CREATE TABLE IF NOT EXISTS protocols (
+      slug TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      url TEXT,
+      logo TEXT,
+      updated_at INTEGER NOT NULL
+    );
   `);
+}
+
+export function upsertProtocols(db, protocols) {
+  const now = Math.floor(Date.now() / 1000);
+  const rows = [];
+  for (const protocol of protocols) {
+    const slug = protocol?.slug;
+    if (!slug) {
+      continue;
+    }
+    rows.push([
+      slug,
+      protocol?.name || slug,
+      protocol?.url || null,
+      protocol?.logo || null,
+      now,
+    ]);
+  }
+
+  const stmt = db.prepare(`
+    INSERT INTO protocols (slug, name, url, logo, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(slug) DO UPDATE SET
+      name=excluded.name,
+      url=excluded.url,
+      logo=excluded.logo,
+      updated_at=excluded.updated_at
+  `);
+
+  const transaction = db.transaction((items) => {
+    for (const row of items) {
+      stmt.run(...row);
+    }
+  });
+
+  transaction(rows);
 }
 
 export function upsertPools(db, pools) {
@@ -410,9 +455,11 @@ export function listPools(db, category, limit) {
   const rows = db.prepare(`
     SELECT p.pool_id, p.project, p.chain, p.symbol, p.url, p.category,
            m.tvl_usd, m.apy, m.apy_base, m.apy_reward, m.apy_30d,
-           m.apy_tvl_slope, m.sample_count
+           m.apy_tvl_slope, m.sample_count,
+           pr.url AS protocol_url, pr.logo AS protocol_logo
     FROM pools p
     JOIN pool_metrics m ON p.pool_id = m.pool_id
+    LEFT JOIN protocols pr ON pr.slug = p.project
     WHERE p.category = ?
     ORDER BY m.apy DESC
     LIMIT ?
