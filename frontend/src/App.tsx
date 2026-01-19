@@ -740,7 +740,7 @@ function App() {
 
             <div className="allocation-header">
               <span>Pool</span>
-              <span>Current / 30D / Expected APY</span>
+              <span>Expected / Current / 30D APY</span>
               <span>TVL</span>
               <span>Allocation</span>
               <span>Weight</span>
@@ -816,6 +816,22 @@ function App() {
                         <div
                           className="apy-item"
                           data-tooltip={`Base: ${formatBaseRewardPercent(
+                            predictedBreakdown.base
+                          )} • Rewards: ${formatBaseRewardPercent(
+                            predictedBreakdown.reward
+                          )}`}
+                        >
+                          <span className="apy-label">Expected</span>
+                          <span className="apy-value">
+                            {formatPercent(predicted)}
+                          </span>
+                        </div>
+                        <span className="apy-sep" aria-hidden="true">
+                          |
+                        </span>
+                        <div
+                          className="apy-item"
+                          data-tooltip={`Base: ${formatBaseRewardPercent(
                             baseCurrent
                           )} • Rewards: ${formatBaseRewardPercent(
                             rewardCurrent
@@ -840,22 +856,6 @@ function App() {
                           <span className="apy-label">30D</span>
                           <span className="apy-value">
                             {formatPercent(pool.apy_30d)}
-                          </span>
-                        </div>
-                        <span className="apy-sep" aria-hidden="true">
-                          |
-                        </span>
-                        <div
-                          className="apy-item"
-                          data-tooltip={`Base: ${formatBaseRewardPercent(
-                            predictedBreakdown.base
-                          )} • Rewards: ${formatBaseRewardPercent(
-                            predictedBreakdown.reward
-                          )}`}
-                        >
-                          <span className="apy-label">Expected</span>
-                          <span className="apy-value">
-                            {formatPercent(predicted)}
                           </span>
                         </div>
                       </div>

@@ -619,6 +619,8 @@ button:hover {
 .apy-sep {
   color: var(--muted);
   font-weight: 600;
+  align-self: flex-end;
+  transform: translateY(0px);
 }
 
 .apy-item::after {
