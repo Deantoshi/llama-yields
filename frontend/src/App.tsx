@@ -16,14 +16,15 @@ const PIE_COLORS = [
 
 type Category = (typeof CATEGORIES)[number];
 
-function formatCurrency(value: number | null) {
+function formatCurrency(value: number | null, digits = 0) {
   if (value == null || Number.isNaN(value)) {
     return "--";
   }
   return value.toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
   });
 }
 
@@ -360,6 +361,32 @@ function App() {
   const annualYield = useMemo(() => {
     return (blendedApy / 100) * totalAllocated;
   }, [blendedApy, totalAllocated]);
+  const monthlyYield = useMemo(() => {
+    return annualYield / 12;
+  }, [annualYield]);
+  const dailyYield = useMemo(() => {
+    return annualYield / 365;
+  }, [annualYield]);
+  const projectedYields = useMemo(
+    () => [
+      {
+        label: "Annual",
+        value: formatCurrency(annualYield, 2),
+        helper: "Yearly",
+      },
+      {
+        label: "Monthly",
+        value: formatCurrency(monthlyYield, 2),
+        helper: "Month",
+      },
+      {
+        label: "Daily",
+        value: formatCurrency(dailyYield, 2),
+        helper: "Day",
+      },
+    ],
+    [annualYield, monthlyYield, dailyYield]
+  );
 
   const allocationStatus = useMemo(() => {
     const delta = totalAllocated - investment;
@@ -565,10 +592,17 @@ function App() {
                 </span>
               </div>
               <div className="summary-card">
-                <span className="summary-label">Projected annual yield</span>
-                <span className="summary-value">
-                  {formatCurrency(annualYield)}
-                </span>
+                <span className="summary-label">Projected yield</span>
+                <div className="yield-row">
+                  {projectedYields.map((yieldItem) => (
+                    <div className="yield-item" key={yieldItem.label}>
+                      <span className="summary-value">{yieldItem.value}</span>
+                      <span className="yield-helper">
+                        {yieldItem.label} · {yieldItem.helper}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="summary-card">
                 <span className="summary-label">Allocation status</span>
