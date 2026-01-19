@@ -9,6 +9,7 @@ import {
   listPools,
   normalizeCategory,
   openDb,
+  searchPools,
 } from "./db.js";
 
 const DEFAULT_HOST = "127.0.0.1";
@@ -62,6 +63,21 @@ async function startServer() {
       const category = normalizeCategory(req.query.category) || "Stablecoins";
       const limit = Number.parseInt(req.query.limit || "200", 10);
       const data = listPools(db, category, limit);
+      res.json({ status: "ok", data });
+    } catch (error) {
+      res.status(500).json({ status: "error", message: error.message });
+    }
+  });
+
+  app.get("/api/pools/search", (req, res) => {
+    try {
+      const query = String(req.query.query || "").trim();
+      const limit = Number.parseInt(req.query.limit || "20", 10);
+      if (!query) {
+        res.json({ status: "ok", data: [] });
+        return;
+      }
+      const data = searchPools(db, query, limit);
       res.json({ status: "ok", data });
     } catch (error) {
       res.status(500).json({ status: "error", message: error.message });

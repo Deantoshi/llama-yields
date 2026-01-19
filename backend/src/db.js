@@ -467,3 +467,23 @@ export function listPools(db, category, limit) {
 
   return rows;
 }
+
+export function searchPools(db, query, limit) {
+  const term = `%${query.toLowerCase()}%`;
+  const rows = db.prepare(`
+    SELECT p.pool_id, p.project, p.chain, p.symbol, p.url, p.category,
+           m.tvl_usd, m.apy, m.apy_base, m.apy_reward, m.apy_30d,
+           m.apy_tvl_slope, m.sample_count,
+           pr.url AS protocol_url, pr.logo AS protocol_logo
+    FROM pools p
+    JOIN pool_metrics m ON p.pool_id = m.pool_id
+    LEFT JOIN protocols pr ON pr.slug = p.project
+    WHERE lower(p.project) LIKE ?
+       OR lower(p.symbol) LIKE ?
+       OR lower(pr.name) LIKE ?
+    ORDER BY m.apy DESC
+    LIMIT ?
+  `).all(term, term, term, limit);
+
+  return rows;
+}
