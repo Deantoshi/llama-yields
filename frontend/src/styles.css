@@ -293,6 +293,48 @@ button:hover {
   font-size: 0.85rem;
 }
 
+.has-tooltip {
+  position: relative;
+}
+
+.has-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  background: rgba(7, 12, 16, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  color: var(--text);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.has-tooltip::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid rgba(7, 12, 16, 0.95);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.has-tooltip:hover::after,
+.has-tooltip:hover::before {
+  opacity: 1;
+}
+
 .chart-section {
   display: grid;
   gap: 16px;

@@ -416,10 +416,42 @@ function App() {
     });
     return totalAllocated > 0 ? weightedSum / totalAllocated : 0;
   }, [allocations, selectedPools, totalAllocated]);
+  const blendedApyBreakdown = useMemo(() => {
+    if (totalAllocated <= 0) {
+      return { base: 0, reward: 0 };
+    }
+    let baseSum = 0;
+    let rewardSum = 0;
+    selectedPools.forEach((pool) => {
+      const allocation = allocations[pool.pool_id] || 0;
+      if (allocation <= 0) {
+        return;
+      }
+      const breakdown = predictedApyBreakdown(pool, allocation);
+      if (breakdown.base == null && breakdown.reward == null) {
+        return;
+      }
+      baseSum += (breakdown.base ?? 0) * allocation;
+      rewardSum += (breakdown.reward ?? 0) * allocation;
+    });
+    return {
+      base: baseSum / totalAllocated,
+      reward: rewardSum / totalAllocated,
+    };
+  }, [allocations, selectedPools, totalAllocated]);
 
   const annualYield = useMemo(() => {
     return (blendedApy / 100) * totalAllocated;
   }, [blendedApy, totalAllocated]);
+  const annualYieldBreakdown = useMemo(() => {
+    if (totalAllocated <= 0) {
+      return { base: 0, reward: 0 };
+    }
+    return {
+      base: (blendedApyBreakdown.base / 100) * totalAllocated,
+      reward: (blendedApyBreakdown.reward / 100) * totalAllocated,
+    };
+  }, [blendedApyBreakdown.base, blendedApyBreakdown.reward, totalAllocated]);
   const monthlyYield = useMemo(() => {
     return annualYield / 12;
   }, [annualYield]);
@@ -432,19 +464,37 @@ function App() {
         label: "Annual",
         value: formatCurrency(annualYield, 2),
         helper: "Yearly",
+        tooltip: `Base: ${formatCurrency(
+          annualYieldBreakdown.base,
+          2
+        )} • Rewards: ${formatCurrency(annualYieldBreakdown.reward, 2)}`,
       },
       {
         label: "Monthly",
         value: formatCurrency(monthlyYield, 2),
         helper: "Month",
+        tooltip: `Base: ${formatCurrency(
+          annualYieldBreakdown.base / 12,
+          2
+        )} • Rewards: ${formatCurrency(annualYieldBreakdown.reward / 12, 2)}`,
       },
       {
         label: "Daily",
         value: formatCurrency(dailyYield, 2),
         helper: "Day",
+        tooltip: `Base: ${formatCurrency(
+          annualYieldBreakdown.base / 365,
+          2
+        )} • Rewards: ${formatCurrency(annualYieldBreakdown.reward / 365, 2)}`,
       },
     ],
-    [annualYield, monthlyYield, dailyYield]
+    [
+      annualYield,
+      annualYieldBreakdown.base,
+      annualYieldBreakdown.reward,
+      monthlyYield,
+      dailyYield,
+    ]
   );
 
   const allocationStatus = useMemo(() => {
@@ -654,7 +704,11 @@ function App() {
                 <span className="summary-label">Projected yield</span>
                 <div className="yield-row">
                   {projectedYields.map((yieldItem) => (
-                    <div className="yield-item" key={yieldItem.label}>
+                    <div
+                      className="yield-item has-tooltip"
+                      data-tooltip={yieldItem.tooltip}
+                      key={yieldItem.label}
+                    >
                       <span className="summary-value">{yieldItem.value}</span>
                       <span className="yield-helper">
                         {yieldItem.label} · {yieldItem.helper}
