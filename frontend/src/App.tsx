@@ -911,12 +911,16 @@ function App() {
                                     loading="lazy"
                                   />
                                 )}
-                                <div>
+                                <div className="search-result-info">
                                   <span className="search-result-title">
                                     {pool.project} · {pool.symbol}
                                   </span>
                                   <span className="search-result-sub">
                                     {pool.chain} • {pool.category}
+                                  </span>
+                                  <span className="search-result-stats">
+                                    TVL {formatCurrency(pool.tvl_usd)} · APY{" "}
+                                    {formatPercent(pool.apy)}
                                   </span>
                                 </div>
                               </div>

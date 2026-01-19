@@ -578,6 +578,12 @@ button:hover {
   font-size: 0.8rem;
 }
 
+.search-result-stats {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
 .search-result-cta {
   color: var(--muted);
   font-weight: 600;
