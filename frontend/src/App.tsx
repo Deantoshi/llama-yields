@@ -141,6 +141,11 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removedPoolIds, setRemovedPoolIds] = useState<string[]>([]);
+  const [manualPools, setManualPools] = useState<Pool[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<Pool[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{
     x: number;
     y: number;
@@ -282,22 +287,40 @@ function App() {
 
   const recomputeSelection = useCallback(() => {
     if (!pools.length) {
-      setSelectedPools([]);
-      setAllocations({});
+      setSelectedPools(manualPools);
+      const allocation = investment / Math.max(1, manualPools.length);
+      const nextAllocations: Record<string, number> = {};
+      manualPools.forEach((pool) => {
+        nextAllocations[pool.pool_id] = allocation;
+      });
+      setAllocations(nextAllocations);
       return;
     }
-    const allocation = investment / Math.max(1, splits);
+    const filteredManualPools = manualPools.filter(
+      (pool) => !removedPoolSet.has(pool.pool_id)
+    );
+    const manualIds = new Set(
+      filteredManualPools.map((pool) => pool.pool_id)
+    );
+    const targetCount = Math.max(splits, filteredManualPools.length);
+    const allocation = investment / Math.max(1, targetCount);
     const scored = pools
-      .filter((pool) => !removedPoolSet.has(pool.pool_id))
+      .filter(
+        (pool) =>
+          !removedPoolSet.has(pool.pool_id) && !manualIds.has(pool.pool_id)
+      )
       .map((pool) => ({
         pool,
         predicted: predictedApy(pool, allocation, includeRewards) ?? 0,
       }));
     scored.sort((a, b) => (b.predicted ?? 0) - (a.predicted ?? 0));
 
-    const selected = scored
-      .slice(0, Math.min(splits, scored.length))
-      .map((item) => item.pool);
+    const selected = [
+      ...filteredManualPools,
+      ...scored
+        .slice(0, Math.min(targetCount - filteredManualPools.length, scored.length))
+        .map((item) => item.pool),
+    ];
 
     setSelectedPools(selected);
     const nextAllocations: Record<string, number> = {};
@@ -305,7 +328,7 @@ function App() {
       nextAllocations[pool.pool_id] = allocation;
     });
     setAllocations(nextAllocations);
-  }, [investment, pools, removedPoolSet, splits, includeRewards]);
+  }, [investment, pools, removedPoolSet, splits, includeRewards, manualPools]);
 
   const autoAllocate = useCallback(() => {
     const allocation = investment / Math.max(1, selectedPools.length);
@@ -320,16 +343,23 @@ function App() {
 
   const removeSelectedPool = useCallback(
     (poolId: string) => {
+      setManualPools((prev) => prev.filter((pool) => pool.pool_id !== poolId));
       setSelectedPools((prev) => {
         const remaining = prev.filter((pool) => pool.pool_id !== poolId);
         const existingIds = new Set(remaining.map((pool) => pool.pool_id));
-        const allocation = investment / Math.max(1, splits);
+        const nextManualPools = manualPools.filter(
+          (pool) => pool.pool_id !== poolId
+        );
+        const targetCount = Math.max(splits, nextManualPools.length);
+        const allocation = investment / Math.max(1, targetCount);
         const nextRemoved = new Set(removedPoolSet);
         nextRemoved.add(poolId);
         const scored = pools
           .filter(
             (pool) =>
-              !existingIds.has(pool.pool_id) && !nextRemoved.has(pool.pool_id)
+              !existingIds.has(pool.pool_id) &&
+              !nextRemoved.has(pool.pool_id) &&
+              !nextManualPools.some((item) => item.pool_id === pool.pool_id)
           )
           .map((pool) => ({
             pool,
@@ -337,7 +367,7 @@ function App() {
           }))
           .sort((a, b) => (b.predicted ?? 0) - (a.predicted ?? 0));
         const replacement =
-          remaining.length < splits ? scored[0]?.pool ?? null : null;
+          remaining.length < targetCount ? scored[0]?.pool ?? null : null;
 
         if (replacement) {
           remaining.push(replacement);
@@ -366,7 +396,7 @@ function App() {
         return [...prev, poolId];
       });
     },
-    [investment, pools, removedPoolSet, splits, includeRewards]
+    [investment, pools, removedPoolSet, splits, includeRewards, manualPools]
   );
 
   useEffect(() => {
@@ -404,12 +434,17 @@ function App() {
 
   useEffect(() => {
     if (!pools.length) {
-      setSelectedPools([]);
-      setAllocations({});
+      setSelectedPools(manualPools);
+      const allocation = investment / Math.max(1, manualPools.length);
+      const nextAllocations: Record<string, number> = {};
+      manualPools.forEach((pool) => {
+        nextAllocations[pool.pool_id] = allocation;
+      });
+      setAllocations(nextAllocations);
       return;
     }
     recomputeSelection();
-  }, [pools, recomputeSelection]);
+  }, [pools, recomputeSelection, investment, manualPools]);
 
   const totalAllocated = useMemo(() => {
     return Object.values(allocations).reduce((sum, value) => sum + value, 0);
@@ -563,6 +598,83 @@ function App() {
       color: string;
     }>;
   }, [allocations, selectedPools, totalAllocated]);
+
+  const addPoolToSelection = useCallback(
+    (pool: Pool) => {
+      setSelectedPools((prev) => {
+        if (prev.some((item) => item.pool_id === pool.pool_id)) {
+          return prev;
+        }
+        return [...prev, pool];
+      });
+      setManualPools((prev) => {
+        if (prev.some((item) => item.pool_id === pool.pool_id)) {
+          return prev;
+        }
+        return [...prev, pool];
+      });
+      setAllocations((prev) => {
+        if (prev[pool.pool_id] != null) {
+          return prev;
+        }
+        const targetCount = Math.max(1, Math.max(splits, selectedPools.length + 1));
+        const allocation = Math.round(investment / targetCount);
+        return { ...prev, [pool.pool_id]: allocation };
+      });
+      setRemovedPoolIds((prev) => prev.filter((id) => id !== pool.pool_id));
+      setSearchTerm("");
+      setSearchResults([]);
+    },
+    [investment, splits, selectedPools.length]
+  );
+
+  useEffect(() => {
+    const query = searchTerm.trim();
+    if (query.length < 2) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      setSearchError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const handle = window.setTimeout(() => {
+      setSearchLoading(true);
+      setSearchError(null);
+      fetch(
+        `/api/pools/search?query=${encodeURIComponent(query)}&limit=20`,
+        { signal: controller.signal }
+      )
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`Search failed (${response.status})`);
+          }
+          return response.json();
+        })
+        .then((payload) => {
+          setSearchResults(payload.data || []);
+        })
+        .catch((err) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+          console.error(err);
+          setSearchError("Search failed. Try again.");
+          setSearchResults([]);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) {
+            setSearchLoading(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(handle);
+      setSearchLoading(false);
+    };
+  }, [searchTerm]);
 
   const handleSliceHover = (
     slice: (typeof chartSlices)[number],
@@ -733,6 +845,96 @@ function App() {
                   {formatCurrency(totalAllocated)} allocated - {allocationStatus}
                 </span>
               </div>
+            </div>
+
+            <div className="allocation-search">
+              <label className="allocation-search-label">
+                <span>Search opportunities</span>
+                <div className="allocation-search-box">
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    placeholder="Search by protocol or symbol (e.g. Maple, USDC)"
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    aria-label="Search pools by protocol or symbol"
+                  />
+                  {searchTerm.trim().length > 0 && (
+                    <div
+                      className="allocation-search-results"
+                      role="listbox"
+                    >
+                      {searchTerm.trim().length < 2 && (
+                        <div className="search-result is-empty">
+                          Type at least 2 characters to search.
+                        </div>
+                      )}
+                      {searchTerm.trim().length >= 2 && searchLoading && (
+                        <div className="search-result is-empty">
+                          Searching pools...
+                        </div>
+                      )}
+                      {searchTerm.trim().length >= 2 &&
+                        !searchLoading &&
+                        searchError && (
+                          <div className="search-result is-empty">
+                            {searchError}
+                          </div>
+                        )}
+                      {searchTerm.trim().length >= 2 &&
+                        !searchLoading &&
+                        !searchError &&
+                        searchResults.length === 0 && (
+                          <div className="search-result is-empty">
+                            No matching pools found.
+                          </div>
+                        )}
+                      {searchTerm.trim().length >= 2 &&
+                        !searchLoading &&
+                        !searchError &&
+                        searchResults.map((pool) => {
+                          const isSelected = selectedPools.some(
+                            (item) => item.pool_id === pool.pool_id
+                          );
+                          return (
+                            <button
+                              className="search-result"
+                              type="button"
+                              key={pool.pool_id}
+                              onClick={() => addPoolToSelection(pool)}
+                              disabled={isSelected}
+                            >
+                              <div className="search-result-meta">
+                                {pool.protocol_logo && (
+                                  <img
+                                    src={pool.protocol_logo}
+                                    alt={`${pool.project} logo`}
+                                    loading="lazy"
+                                  />
+                                )}
+                                <div>
+                                  <span className="search-result-title">
+                                    {pool.project} · {pool.symbol}
+                                  </span>
+                                  <span className="search-result-sub">
+                                    {pool.chain} • {pool.category}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="search-result-cta">
+                                {isSelected ? "Added" : "Add"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              </label>
+              <span className="allocation-search-meta">
+                {searchResults.length
+                  ? `${searchResults.length} results`
+                  : `${selectedPools.length} pools in table`}
+              </span>
             </div>
 
             <div className="allocation-header">

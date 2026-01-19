@@ -472,6 +472,125 @@ button:hover {
   padding: 8px 0;
 }
 
+.allocation-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.allocation-search-label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.allocation-search-box {
+  position: relative;
+}
+
+.allocation-search input {
+  width: min(460px, 100%);
+  background: rgba(7, 12, 16, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.allocation-search input::placeholder {
+  color: rgba(148, 163, 184, 0.7);
+}
+
+.allocation-search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(520px, 80vw);
+  max-height: 240px;
+  overflow-y: auto;
+  background: rgba(8, 12, 17, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 6px;
+  box-shadow: var(--shadow);
+  z-index: 5;
+}
+
+.search-result {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.search-result:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(12, 18, 24, 0.7);
+}
+
+.search-result:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.search-result.is-empty {
+  cursor: default;
+  color: var(--muted);
+  justify-content: center;
+  border-color: transparent;
+}
+
+.search-result-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.search-result-meta img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 12, 17, 0.8);
+}
+
+.search-result-title {
+  display: block;
+  font-weight: 600;
+}
+
+.search-result-sub {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.search-result-cta {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.allocation-search-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .allocation-rows {
   display: grid;
   gap: 12px;
