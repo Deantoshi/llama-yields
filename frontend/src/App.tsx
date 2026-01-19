@@ -49,26 +49,33 @@ function formatNumber(value: number) {
   return value.toLocaleString("en-US");
 }
 
-function predictedApy(pool: Pool, allocation: number) {
+function predictedApy(pool: Pool, allocation: number, includeRewards: boolean) {
   if (pool.apy == null && pool.apy_base == null && pool.apy_reward == null) {
     return null;
   }
+  const fallbackBase = includeRewards ? 0 : pool.apy ?? 0;
   const slope = pool.apy_tvl_slope ?? 0;
-  const base = pool.apy_base ?? 0;
-  const reward =
-    pool.apy_reward ??
-    (pool.apy != null ? Math.max(0, pool.apy - base) : 0);
+  const base = pool.apy_base ?? fallbackBase;
+  if (!includeRewards) {
+    return Math.max(0, base);
+  }
+  const reward = pool.apy_reward ?? Math.max(0, (pool.apy ?? 0) - base);
   const predictedReward = Math.max(0, reward + slope * allocation);
   return Math.max(0, base + predictedReward);
 }
 
-function predictedApyBreakdown(pool: Pool, allocation: number) {
-  const predicted = predictedApy(pool, allocation);
+function predictedApyBreakdown(
+  pool: Pool,
+  allocation: number,
+  includeRewards: boolean
+) {
+  const predicted = predictedApy(pool, allocation, includeRewards);
   if (predicted == null) {
     return { base: null, reward: null };
   }
-  const base = pool.apy_base ?? 0;
-  const reward = Math.max(0, predicted - base);
+  const fallbackBase = includeRewards ? 0 : pool.apy ?? 0;
+  const base = pool.apy_base ?? fallbackBase;
+  const reward = includeRewards ? Math.max(0, predicted - base) : 0;
   return { base, reward };
 }
 
@@ -115,6 +122,7 @@ function App() {
   const [splits, setSplits] = useState(6);
   const [impactPoolId, setImpactPoolId] = useState<string | null>(null);
   const [impactAmount, setImpactAmount] = useState(25000);
+  const [includeRewards, setIncludeRewards] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removedPoolIds, setRemovedPoolIds] = useState<string[]>([]);
@@ -268,7 +276,7 @@ function App() {
       .filter((pool) => !removedPoolSet.has(pool.pool_id))
       .map((pool) => ({
         pool,
-        predicted: predictedApy(pool, allocation) ?? 0,
+        predicted: predictedApy(pool, allocation, includeRewards) ?? 0,
       }));
     scored.sort((a, b) => (b.predicted ?? 0) - (a.predicted ?? 0));
 
@@ -282,7 +290,7 @@ function App() {
       nextAllocations[pool.pool_id] = allocation;
     });
     setAllocations(nextAllocations);
-  }, [investment, pools, removedPoolSet, splits]);
+  }, [investment, pools, removedPoolSet, splits, includeRewards]);
 
   const autoAllocate = useCallback(() => {
     const allocation = investment / Math.max(1, selectedPools.length);
@@ -310,7 +318,7 @@ function App() {
           )
           .map((pool) => ({
             pool,
-            predicted: predictedApy(pool, allocation) ?? 0,
+            predicted: predictedApy(pool, allocation, includeRewards) ?? 0,
           }))
           .sort((a, b) => (b.predicted ?? 0) - (a.predicted ?? 0));
         const replacement =
@@ -343,7 +351,7 @@ function App() {
         return [...prev, poolId];
       });
     },
-    [investment, pools, removedPoolSet, splits]
+    [investment, pools, removedPoolSet, splits, includeRewards]
   );
 
   useEffect(() => {
@@ -409,13 +417,13 @@ function App() {
     let weightedSum = 0;
     selectedPools.forEach((pool) => {
       const allocation = allocations[pool.pool_id] || 0;
-      const predicted = predictedApy(pool, allocation);
+      const predicted = predictedApy(pool, allocation, includeRewards);
       if (predicted != null) {
         weightedSum += predicted * allocation;
       }
     });
     return totalAllocated > 0 ? weightedSum / totalAllocated : 0;
-  }, [allocations, selectedPools, totalAllocated]);
+  }, [allocations, selectedPools, totalAllocated, includeRewards]);
   const blendedApyBreakdown = useMemo(() => {
     if (totalAllocated <= 0) {
       return { base: 0, reward: 0 };
@@ -427,7 +435,11 @@ function App() {
       if (allocation <= 0) {
         return;
       }
-      const breakdown = predictedApyBreakdown(pool, allocation);
+      const breakdown = predictedApyBreakdown(
+        pool,
+        allocation,
+        includeRewards
+      );
       if (breakdown.base == null && breakdown.reward == null) {
         return;
       }
@@ -438,7 +450,7 @@ function App() {
       base: baseSum / totalAllocated,
       reward: rewardSum / totalAllocated,
     };
-  }, [allocations, selectedPools, totalAllocated]);
+  }, [allocations, selectedPools, totalAllocated, includeRewards]);
 
   const annualYield = useMemo(() => {
     return (blendedApy / 100) * totalAllocated;
@@ -512,9 +524,13 @@ function App() {
     return pools.find((pool) => pool.pool_id === impactPoolId) || null;
   }, [impactPoolId, pools]);
 
-  const impactCurrent = impactPool?.apy ?? null;
+  const impactCurrent = impactPool
+    ? includeRewards
+      ? impactPool.apy
+      : impactPool.apy_base ?? impactPool.apy
+    : null;
   const impactPredicted = impactPool
-    ? predictedApy(impactPool, impactAmount)
+    ? predictedApy(impactPool, impactAmount, includeRewards)
     : null;
   const impactDelta =
     impactCurrent != null && impactPredicted != null
@@ -535,7 +551,7 @@ function App() {
         const weight = allocation / totalAllocated;
         const angle = weight * 360;
         const endAngle = startAngle + angle;
-        const predicted = predictedApy(pool, allocation);
+        const predicted = predictedApy(pool, allocation, includeRewards);
         const expectedYield =
           predicted != null ? (predicted / 100) * allocation : null;
         const slice = {
@@ -681,6 +697,18 @@ function App() {
                 />
               </label>
               <div className="control">
+                <span>Rewards APY</span>
+                <div className="control-actions">
+                  <button
+                    className={includeRewards ? "solid" : "ghost"}
+                    aria-pressed={includeRewards}
+                    onClick={() => setIncludeRewards((prev) => !prev)}
+                  >
+                    {includeRewards ? "Rewards on" : "Rewards off"}
+                  </button>
+                </div>
+              </div>
+              <div className="control">
                 <span>Allocation tools</span>
                 <div className="control-actions">
                   <button className="ghost" onClick={autoAllocate}>
@@ -750,11 +778,25 @@ function App() {
                 !error &&
                 selectedPools.map((pool) => {
                   const allocation = allocations[pool.pool_id] || 0;
-                  const predicted = predictedApy(pool, allocation);
+                  const predicted = predictedApy(
+                    pool,
+                    allocation,
+                    includeRewards
+                  );
                   const predictedBreakdown = predictedApyBreakdown(
                     pool,
-                    allocation
+                    allocation,
+                    includeRewards
                   );
+                  const baseCurrent =
+                    pool.apy_base ?? (includeRewards ? 0 : pool.apy ?? 0);
+                  const rewardCurrent = includeRewards
+                    ? pool.apy_reward ??
+                      Math.max(0, (pool.apy ?? 0) - baseCurrent)
+                    : 0;
+                  const currentApy = includeRewards
+                    ? pool.apy
+                    : pool.apy_base ?? pool.apy;
                   const totalTarget =
                     totalAllocated > 0 ? totalAllocated : investment;
                   const allocationPercent =
@@ -784,14 +826,14 @@ function App() {
                         <div
                           className="apy-item"
                           data-tooltip={`Base: ${formatBaseRewardPercent(
-                            pool.apy_base
+                            baseCurrent
                           )} • Rewards: ${formatBaseRewardPercent(
-                            pool.apy_reward
+                            rewardCurrent
                           )}`}
                         >
                           <span className="apy-label">Current</span>
                           <span className="apy-value">
-                            {formatPercent(pool.apy)}
+                            {formatPercent(currentApy)}
                           </span>
                         </div>
                         <span className="apy-sep" aria-hidden="true">
