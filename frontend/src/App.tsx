@@ -34,6 +34,16 @@ function formatPercent(value: number | null, digits = 2) {
   return `${value.toFixed(digits)}%`;
 }
 
+function formatBaseRewardPercent(value: number | null) {
+  if (value == null || Number.isNaN(value)) {
+    return "0%";
+  }
+  if (value === 0) {
+    return "0%";
+  }
+  return formatPercent(value);
+}
+
 function formatNumber(value: number) {
   return value.toLocaleString("en-US");
 }
@@ -607,9 +617,11 @@ function App() {
                       <div className="apy-cell" data-role="apy">
                         <div
                           className="apy-item"
-                          data-tooltip={`Base: ${formatPercent(
+                          data-tooltip={`Base: ${formatBaseRewardPercent(
                             pool.apy_base
-                          )} • Rewards: ${formatPercent(pool.apy_reward)}`}
+                          )} • Rewards: ${formatBaseRewardPercent(
+                            pool.apy_reward
+                          )}`}
                         >
                           <span className="apy-label">Current</span>
                           <span className="apy-value">
@@ -621,9 +633,11 @@ function App() {
                         </span>
                         <div
                           className="apy-item"
-                          data-tooltip={`Base: ${formatPercent(
+                          data-tooltip={`Base: ${formatBaseRewardPercent(
                             pool.apy_base
-                          )} • Rewards: ${formatPercent(pool.apy_reward)}`}
+                          )} • Rewards: ${formatBaseRewardPercent(
+                            pool.apy_reward
+                          )}`}
                         >
                           <span className="apy-label">Expected</span>
                           <span className="apy-value">
