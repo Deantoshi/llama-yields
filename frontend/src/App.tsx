@@ -117,6 +117,7 @@ function App() {
   const [impactAmount, setImpactAmount] = useState(25000);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [removedPoolIds, setRemovedPoolIds] = useState<string[]>([]);
   const [tooltip, setTooltip] = useState<{
     x: number;
     y: number;
@@ -124,6 +125,10 @@ function App() {
     value: string;
   } | null>(null);
   const lastWeightsRef = useRef<Record<string, number>>({});
+  const removedPoolSet = useMemo(
+    () => new Set(removedPoolIds),
+    [removedPoolIds]
+  );
 
   useEffect(() => {
     if (!selectedPools.length) {
@@ -259,10 +264,12 @@ function App() {
       return;
     }
     const allocation = investment / Math.max(1, splits);
-    const scored = pools.map((pool) => ({
-      pool,
-      predicted: predictedApy(pool, allocation) ?? 0,
-    }));
+    const scored = pools
+      .filter((pool) => !removedPoolSet.has(pool.pool_id))
+      .map((pool) => ({
+        pool,
+        predicted: predictedApy(pool, allocation) ?? 0,
+      }));
     scored.sort((a, b) => (b.predicted ?? 0) - (a.predicted ?? 0));
 
     const selected = scored
@@ -275,7 +282,7 @@ function App() {
       nextAllocations[pool.pool_id] = allocation;
     });
     setAllocations(nextAllocations);
-  }, [investment, pools, splits]);
+  }, [investment, pools, removedPoolSet, splits]);
 
   const autoAllocate = useCallback(() => {
     const allocation = investment / Math.max(1, selectedPools.length);
@@ -288,10 +295,62 @@ function App() {
     });
   }, [investment, selectedPools]);
 
+  const removeSelectedPool = useCallback(
+    (poolId: string) => {
+      setSelectedPools((prev) => {
+        const remaining = prev.filter((pool) => pool.pool_id !== poolId);
+        const existingIds = new Set(remaining.map((pool) => pool.pool_id));
+        const allocation = investment / Math.max(1, splits);
+        const nextRemoved = new Set(removedPoolSet);
+        nextRemoved.add(poolId);
+        const scored = pools
+          .filter(
+            (pool) =>
+              !existingIds.has(pool.pool_id) && !nextRemoved.has(pool.pool_id)
+          )
+          .map((pool) => ({
+            pool,
+            predicted: predictedApy(pool, allocation) ?? 0,
+          }))
+          .sort((a, b) => (b.predicted ?? 0) - (a.predicted ?? 0));
+        const replacement =
+          remaining.length < splits ? scored[0]?.pool ?? null : null;
+
+        if (replacement) {
+          remaining.push(replacement);
+        }
+
+        setAllocations((prevAlloc) => {
+          const next = { ...prevAlloc };
+          const removedAllocation = next[poolId] ?? 0;
+          delete next[poolId];
+          if (replacement) {
+            next[replacement.pool_id] = removedAllocation || allocation;
+          }
+          return next;
+        });
+
+        const nextWeights = { ...lastWeightsRef.current };
+        delete nextWeights[poolId];
+        lastWeightsRef.current = nextWeights;
+
+        return remaining;
+      });
+      setRemovedPoolIds((prev) => {
+        if (prev.includes(poolId)) {
+          return prev;
+        }
+        return [...prev, poolId];
+      });
+    },
+    [investment, pools, removedPoolSet, splits]
+  );
+
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
+    setRemovedPoolIds([]);
 
     fetch(`/api/pools?category=${encodeURIComponent(category)}`)
       .then((response) => response.json())
@@ -618,6 +677,7 @@ function App() {
               <span>TVL</span>
               <span>Allocation</span>
               <span>Weight</span>
+              <span>Remove</span>
             </div>
 
             <div className="allocation-rows">
@@ -776,6 +836,14 @@ function App() {
                         </div>
                       </div>
                       <div data-role="weight">{formatPercent(weight, 1)}</div>
+                      <button
+                        className="row-remove"
+                        type="button"
+                        onClick={() => removeSelectedPool(pool.pool_id)}
+                        aria-label={`Remove ${pool.project} ${pool.symbol}`}
+                      >
+                        x
+                      </button>
                     </div>
                   );
                 })}

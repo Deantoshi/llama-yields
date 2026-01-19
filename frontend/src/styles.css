@@ -413,7 +413,11 @@ button:hover {
 .allocation-header,
 .allocation-row {
   display: grid;
-  grid-template-columns: 2fr minmax(200px, 1.2fr) repeat(3, minmax(100px, 1fr));
+  grid-template-columns:
+    2fr
+    minmax(200px, 1.2fr)
+    repeat(3, minmax(100px, 1fr))
+    64px;
   gap: 12px;
   align-items: center;
 }
@@ -437,6 +441,24 @@ button:hover {
   border: 1px solid var(--border);
   background: rgba(8, 12, 17, 0.6);
   animation: rise 0.5s ease both;
+}
+
+.row-remove {
+  justify-self: center;
+  border: 1px solid var(--border);
+  background: rgba(12, 18, 24, 0.8);
+  color: var(--text);
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.row-remove:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .pool-meta {
