@@ -534,17 +534,37 @@ function App() {
                               }}
                             />
                             <div className="allocation-ticks" aria-hidden="true">
-                              <span />
-                              <span />
-                              <span />
-                              <span />
+                              {[0, 25, 50, 75, 100].map((percent) => (
+                                <span
+                                  key={percent}
+                                  className="allocation-tick-mark"
+                                  style={{
+                                    left: `${percent}%`,
+                                    transform:
+                                      percent === 0
+                                        ? "translateX(0)"
+                                        : percent === 100
+                                          ? "translateX(-100%)"
+                                        : "translateX(-50%)",
+                                  }}
+                                />
+                              ))}
                             </div>
                             <div className="allocation-tick-labels">
-                              {[25, 50, 75, 100].map((percent) => (
+                              {[0, 25, 50, 75, 100].map((percent) => (
                                 <button
                                   key={percent}
                                   type="button"
                                   className="allocation-tick"
+                                  style={{
+                                    left: `${percent}%`,
+                                    transform:
+                                      percent === 0
+                                        ? "translateX(0)"
+                                        : percent === 100
+                                          ? "translateX(-100%)"
+                                        : "translateX(-50%)",
+                                  }}
                                   onClick={() => {
                                     const value = Math.round(
                                       (investment * percent) / 100
