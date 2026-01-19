@@ -796,6 +796,7 @@ function App() {
                           Math.max(0, (allocation / totalTarget) * 100)
                         )
                       : 0;
+                  const poolUrl = pool.url?.trim() || "";
                   const weight =
                     totalAllocated > 0
                       ? (allocation / totalAllocated) * 100
@@ -810,7 +811,36 @@ function App() {
                         <span className="pool-title">
                           {pool.project} - {pool.symbol}
                         </span>
-                        <span className="pool-sub">{pool.chain}</span>
+                        <span className="pool-sub">
+                          {pool.chain}
+                          {poolUrl ? (
+                            <a
+                              className="pool-link"
+                              href={poolUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={`Open ${pool.project} ${pool.symbol} link`}
+                            >
+                              <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3zM5 5h6V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6h-2v6H5V5z"
+                                />
+                              </svg>
+                            </a>
+                          ) : (
+                            <span
+                              className="pool-link is-disabled"
+                              aria-disabled="true"
+                              aria-label={`No link available for ${pool.project} ${pool.symbol}`}
+                            >
+                              <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3zM5 5h6V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6h-2v6H5V5z"
+                                />
+                              </svg>
+                            </span>
+                          )}
+                        </span>
                       </div>
                       <div className="apy-cell" data-role="apy">
                         <div
