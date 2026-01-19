@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Pool } from "./types";
 
 const CATEGORIES = ["Stablecoins", "ETH", "BTC"] as const;
@@ -98,6 +98,134 @@ function App() {
     title: string;
     value: string;
   } | null>(null);
+  const lastWeightsRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!selectedPools.length) {
+      return;
+    }
+    const total = selectedPools.reduce(
+      (sum, pool) => sum + (allocations[pool.pool_id] || 0),
+      0
+    );
+    const nonZero = selectedPools.filter(
+      (pool) => (allocations[pool.pool_id] || 0) > 0
+    );
+    if (total <= 0 || nonZero.length < 2) {
+      return;
+    }
+    const maxShare = Math.max(
+      ...selectedPools.map((pool) => (allocations[pool.pool_id] || 0) / total)
+    );
+    if (maxShare >= 0.98) {
+      return;
+    }
+    const nextWeights: Record<string, number> = {};
+    selectedPools.forEach((pool) => {
+      const value = allocations[pool.pool_id] || 0;
+      nextWeights[pool.pool_id] = value / total;
+    });
+    lastWeightsRef.current = nextWeights;
+  }, [allocations, selectedPools]);
+
+  const updateAllocationByPercent = useCallback(
+    (poolId: string, percent: number) => {
+      setAllocations((prev) => {
+        const poolIds = selectedPools.map((pool) => pool.pool_id);
+        if (!poolIds.includes(poolId)) {
+          return prev;
+        }
+
+        const totalCurrent = poolIds.reduce(
+          (sum, id) => sum + (prev[id] || 0),
+          0
+        );
+        const totalTarget = totalCurrent > 0 ? totalCurrent : investment;
+        const clampedPercent = Math.min(100, Math.max(0, percent));
+        const nextAllocation = Math.round(
+          (totalTarget * clampedPercent) / 100
+        );
+        const otherIds = poolIds.filter((id) => id !== poolId);
+        if (clampedPercent >= 100 && totalCurrent > 0) {
+          const stored = lastWeightsRef.current;
+          const hasStoredForOthers = otherIds.some((id) => (stored[id] || 0) > 0);
+          if (!hasStoredForOthers) {
+            const snapshot: Record<string, number> = {};
+            poolIds.forEach((id) => {
+              snapshot[id] = (prev[id] || 0) / totalCurrent;
+            });
+            lastWeightsRef.current = snapshot;
+          }
+        }
+        const next = { ...prev, [poolId]: nextAllocation };
+        const remaining = totalTarget - nextAllocation;
+
+        if (!otherIds.length) {
+          return next;
+        }
+
+        if (remaining <= 0) {
+          otherIds.forEach((id) => {
+            next[id] = 0;
+          });
+          return next;
+        }
+
+        const storedWeights = lastWeightsRef.current;
+        const storedTotal = otherIds.reduce(
+          (sum, id) => sum + (storedWeights[id] || 0),
+          0
+        );
+        const currentOthersTotal = otherIds.reduce(
+          (sum, id) => sum + (prev[id] || 0),
+          0
+        );
+
+        const weights = otherIds.map((id) => {
+          if (storedTotal > 0) {
+            return storedWeights[id] || 0;
+          }
+          if (currentOthersTotal > 0) {
+            return prev[id] || 0;
+          }
+          return 1;
+        });
+        const weightTotal =
+          storedTotal > 0
+            ? storedTotal
+            : currentOthersTotal > 0
+              ? currentOthersTotal
+              : weights.length;
+
+        const allocationsById: Record<string, number> = {};
+        const remainders = weights
+          .map((weight, index) => {
+            const raw = (remaining * weight) / weightTotal;
+            const base = Math.floor(raw);
+            allocationsById[otherIds[index]] = base;
+            return { index, frac: raw - base };
+          })
+          .sort((a, b) => b.frac - a.frac);
+
+        let remainder = remaining - Object.values(allocationsById).reduce(
+          (sum, value) => sum + value,
+          0
+        );
+        for (let i = 0; i < remainders.length && remainder > 0; i += 1) {
+          const id = otherIds[remainders[i].index];
+          allocationsById[id] += 1;
+          remainder -= 1;
+        }
+
+        otherIds.forEach((id) => {
+          next[id] = allocationsById[id] || 0;
+        });
+
+        return next;
+      });
+    },
+    [investment, selectedPools]
+  );
 
   const recomputeSelection = useCallback(() => {
     if (!pools.length) {
@@ -451,9 +579,14 @@ function App() {
                 selectedPools.map((pool) => {
                   const allocation = allocations[pool.pool_id] || 0;
                   const predicted = predictedApy(pool, allocation);
+                  const totalTarget =
+                    totalAllocated > 0 ? totalAllocated : investment;
                   const allocationPercent =
-                    investment > 0
-                      ? Math.min(100, Math.max(0, (allocation / investment) * 100))
+                    totalTarget > 0
+                      ? Math.min(
+                          100,
+                          Math.max(0, (allocation / totalTarget) * 100)
+                        )
                       : 0;
                   const weight =
                     totalAllocated > 0
@@ -524,13 +657,7 @@ function App() {
                               value={allocationPercent}
                               onChange={(event) => {
                                 const percent = Number(event.target.value) || 0;
-                                const value = Math.round(
-                                  (investment * percent) / 100
-                                );
-                                setAllocations((prev) => ({
-                                  ...prev,
-                                  [pool.pool_id]: value,
-                                }));
+                                updateAllocationByPercent(pool.pool_id, percent);
                               }}
                             />
                             <div className="allocation-ticks" aria-hidden="true">
@@ -563,16 +690,13 @@ function App() {
                                         ? "translateX(0)"
                                         : percent === 100
                                           ? "translateX(-100%)"
-                                        : "translateX(-50%)",
+                                          : "translateX(-50%)",
                                   }}
                                   onClick={() => {
-                                    const value = Math.round(
-                                      (investment * percent) / 100
+                                    updateAllocationByPercent(
+                                      pool.pool_id,
+                                      percent
                                     );
-                                    setAllocations((prev) => ({
-                                      ...prev,
-                                      [pool.pool_id]: value,
-                                    }));
                                   }}
                                 >
                                   {percent}%
