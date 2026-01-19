@@ -659,33 +659,6 @@ button:hover {
   opacity: 1;
 }
 
-.impact {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  align-items: end;
-}
-
-.impact-card {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
-  background: rgba(8, 12, 17, 0.6);
-  border-radius: 16px;
-  padding: 16px;
-  border: 1px solid var(--border);
-}
-
-.impact-label {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.impact-value {
-  display: block;
-  margin-top: 6px;
-  font-size: 1.3rem;
-  font-weight: 600;
-}
-
 .footer {
   padding: 20px clamp(20px, 4vw, 70px) 40px;
   color: var(--muted);

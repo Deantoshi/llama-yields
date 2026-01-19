@@ -120,8 +120,6 @@ function App() {
     formatNumber(100000)
   );
   const [splits, setSplits] = useState(6);
-  const [impactPoolId, setImpactPoolId] = useState<string | null>(null);
-  const [impactAmount, setImpactAmount] = useState(25000);
   const [includeRewards, setIncludeRewards] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -396,19 +394,6 @@ function App() {
     recomputeSelection();
   }, [pools, recomputeSelection]);
 
-  useEffect(() => {
-    if (!pools.length) {
-      setImpactPoolId(null);
-      return;
-    }
-    setImpactPoolId((prev) => {
-      if (prev && pools.some((pool) => pool.pool_id === prev)) {
-        return prev;
-      }
-      return pools[0].pool_id;
-    });
-  }, [pools]);
-
   const totalAllocated = useMemo(() => {
     return Object.values(allocations).reduce((sum, value) => sum + value, 0);
   }, [allocations]);
@@ -519,23 +504,6 @@ function App() {
     }
     return `Unallocated ${formatCurrency(Math.abs(delta))}`;
   }, [investment, totalAllocated]);
-
-  const impactPool = useMemo(() => {
-    return pools.find((pool) => pool.pool_id === impactPoolId) || null;
-  }, [impactPoolId, pools]);
-
-  const impactCurrent = impactPool
-    ? includeRewards
-      ? impactPool.apy
-      : impactPool.apy_base ?? impactPool.apy
-    : null;
-  const impactPredicted = impactPool
-    ? predictedApy(impactPool, impactAmount, includeRewards)
-    : null;
-  const impactDelta =
-    impactCurrent != null && impactPredicted != null
-      ? impactPredicted - impactCurrent
-      : null;
 
   const chartSlices = useMemo(() => {
     if (totalAllocated <= 0) {
@@ -1037,63 +1005,6 @@ function App() {
           </div>
         </section>
 
-        <section className="panel" id="impact-panel">
-          <div className="panel-head">
-            <div>
-              <h2>Single-Pool Impact</h2>
-              <p className="panel-sub">See how your capital shifts APY for any pool.</p>
-            </div>
-          </div>
-          <div className="panel-body impact">
-            <label className="control">
-              <span>Pool</span>
-              <select
-                id="impact-pool"
-                value={impactPoolId ?? ""}
-                onChange={(event) => setImpactPoolId(event.target.value)}
-              >
-                {pools.slice(0, 200).map((pool) => (
-                  <option key={pool.pool_id} value={pool.pool_id}>
-                    {pool.project} - {pool.symbol} ({pool.chain})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="control">
-              <span>Investment (USD)</span>
-              <input
-                id="impact-amount"
-                type="number"
-                min="0"
-                step="100"
-                value={impactAmount}
-                onChange={(event) =>
-                  setImpactAmount(Number(event.target.value) || 0)
-                }
-              />
-            </label>
-            <div className="impact-card">
-              <div>
-                <span className="impact-label">Current APY</span>
-                <span className="impact-value">
-                  {formatPercent(impactCurrent)}
-                </span>
-              </div>
-              <div>
-                <span className="impact-label">Predicted APY</span>
-                <span className="impact-value">
-                  {formatPercent(impactPredicted)}
-                </span>
-              </div>
-              <div>
-                <span className="impact-label">Delta</span>
-                <span className="impact-value">
-                  {impactDelta == null ? "--" : formatPercent(impactDelta)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
       </main>
 
       <footer className="footer">
