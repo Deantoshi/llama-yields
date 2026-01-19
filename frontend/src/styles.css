@@ -394,7 +394,7 @@ button:hover {
 .allocation-header,
 .allocation-row {
   display: grid;
-  grid-template-columns: 2fr repeat(5, minmax(100px, 1fr));
+  grid-template-columns: 2fr minmax(200px, 1.2fr) repeat(3, minmax(100px, 1fr));
   gap: 12px;
   align-items: center;
 }
@@ -436,6 +436,78 @@ button:hover {
 
 .allocation-row input {
   width: 100%;
+  background: rgba(7, 12, 16, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.apy-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.apy-item {
+  display: grid;
+  gap: 2px;
+  position: relative;
+}
+
+.apy-label {
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.apy-value {
+  font-weight: 600;
+}
+
+.apy-sep {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.apy-item::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  background: rgba(7, 12, 16, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  color: var(--text);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.apy-item::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid rgba(7, 12, 16, 0.95);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.apy-item:hover::after,
+.apy-item:hover::before {
+  opacity: 1;
 }
 
 .impact {

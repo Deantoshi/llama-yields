@@ -428,10 +428,9 @@ function App() {
 
             <div className="allocation-header">
               <span>Pool</span>
-              <span>Current APY</span>
+              <span>Current / Expected APY</span>
               <span>TVL</span>
               <span>Allocation</span>
-              <span>Predicted APY</span>
               <span>Weight</span>
             </div>
 
@@ -468,8 +467,32 @@ function App() {
                         </span>
                         <span className="pool-sub">{pool.chain}</span>
                       </div>
-                      <div data-role="current-apy">
-                        {formatPercent(pool.apy)}
+                      <div className="apy-cell" data-role="apy">
+                        <div
+                          className="apy-item"
+                          data-tooltip={`Base: ${formatPercent(
+                            pool.apy_base
+                          )} • Rewards: ${formatPercent(pool.apy_reward)}`}
+                        >
+                          <span className="apy-label">Current</span>
+                          <span className="apy-value">
+                            {formatPercent(pool.apy)}
+                          </span>
+                        </div>
+                        <span className="apy-sep" aria-hidden="true">
+                          |
+                        </span>
+                        <div
+                          className="apy-item"
+                          data-tooltip={`Base: ${formatPercent(
+                            pool.apy_base
+                          )} • Rewards: ${formatPercent(pool.apy_reward)}`}
+                        >
+                          <span className="apy-label">Expected</span>
+                          <span className="apy-value">
+                            {formatPercent(predicted)}
+                          </span>
+                        </div>
                       </div>
                       <div data-role="tvl">{formatCurrency(pool.tvl_usd)}</div>
                       <div>
@@ -486,9 +509,6 @@ function App() {
                             }));
                           }}
                         />
-                      </div>
-                      <div data-role="predicted">
-                        {formatPercent(predicted)}
                       </div>
                       <div data-role="weight">{formatPercent(weight, 1)}</div>
                     </div>
