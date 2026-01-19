@@ -549,6 +549,26 @@ button:hover {
   gap: 4px;
 }
 
+.pool-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pool-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(8, 12, 17, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pool-meta-text {
+  display: grid;
+  gap: 4px;
+}
+
 .pool-title {
   font-weight: 600;
 }
@@ -556,6 +576,9 @@ button:hover {
 .pool-sub {
   color: var(--muted);
   font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .allocation-row input[type="text"] {

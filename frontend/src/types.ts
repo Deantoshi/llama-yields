@@ -4,6 +4,8 @@ export type Pool = {
   chain: string;
   symbol: string;
   url: string | null;
+  protocol_url: string | null;
+  protocol_logo: string | null;
   category: string;
   tvl_usd: number | null;
   apy: number | null;
