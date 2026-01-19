@@ -699,9 +699,6 @@ function App() {
                   <button className="ghost" onClick={autoAllocate}>
                     Auto-allocate
                   </button>
-                  <button className="solid" onClick={recomputeSelection}>
-                    Recompute ranking
-                  </button>
                 </div>
               </div>
             </div>
