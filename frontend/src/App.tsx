@@ -49,12 +49,26 @@ function formatNumber(value: number) {
 }
 
 function predictedApy(pool: Pool, allocation: number) {
-  if (pool.apy == null) {
+  if (pool.apy == null && pool.apy_base == null && pool.apy_reward == null) {
     return null;
   }
   const slope = pool.apy_tvl_slope ?? 0;
-  const predicted = pool.apy + slope * allocation;
-  return Math.max(0, predicted);
+  const base = pool.apy_base ?? 0;
+  const reward =
+    pool.apy_reward ??
+    (pool.apy != null ? Math.max(0, pool.apy - base) : 0);
+  const predictedReward = Math.max(0, reward + slope * allocation);
+  return Math.max(0, base + predictedReward);
+}
+
+function predictedApyBreakdown(pool: Pool, allocation: number) {
+  const predicted = predictedApy(pool, allocation);
+  if (predicted == null) {
+    return { base: null, reward: null };
+  }
+  const base = pool.apy_base ?? 0;
+  const reward = Math.max(0, predicted - base);
+  return { base, reward };
 }
 
 function describeArc(
@@ -589,6 +603,10 @@ function App() {
                 selectedPools.map((pool) => {
                   const allocation = allocations[pool.pool_id] || 0;
                   const predicted = predictedApy(pool, allocation);
+                  const predictedBreakdown = predictedApyBreakdown(
+                    pool,
+                    allocation
+                  );
                   const totalTarget =
                     totalAllocated > 0 ? totalAllocated : investment;
                   const allocationPercent =
@@ -634,9 +652,9 @@ function App() {
                         <div
                           className="apy-item"
                           data-tooltip={`Base: ${formatBaseRewardPercent(
-                            pool.apy_base
+                            predictedBreakdown.base
                           )} • Rewards: ${formatBaseRewardPercent(
-                            pool.apy_reward
+                            predictedBreakdown.reward
                           )}`}
                         >
                           <span className="apy-label">Expected</span>

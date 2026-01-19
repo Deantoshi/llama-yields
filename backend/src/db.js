@@ -330,12 +330,12 @@ export function recomputeMetrics(db, { poolId = null, windowDays = 90 } = {}) {
     WHERE pool_id = ? AND ts = ?
   `);
   const samplesStmt = db.prepare(`
-    SELECT tvl_usd, apy
+    SELECT tvl_usd, apy_reward
     FROM pool_history
     WHERE pool_id = ?
       AND ts >= ?
       AND tvl_usd IS NOT NULL
-      AND apy IS NOT NULL
+      AND apy_reward IS NOT NULL
   `);
   const upsertStmt = db.prepare(`
     INSERT INTO pool_metrics (
@@ -373,7 +373,7 @@ export function recomputeMetrics(db, { poolId = null, windowDays = 90 } = {}) {
     }
 
     const xs = samples.map((sample) => sample.tvl_usd);
-    const ys = samples.map((sample) => sample.apy);
+    const ys = samples.map((sample) => sample.apy_reward);
     const meanX = xs.reduce((sum, value) => sum + value, 0) / xs.length;
     const meanY = ys.reduce((sum, value) => sum + value, 0) / ys.length;
     const varX = xs.reduce((sum, value) => sum + (value - meanX) ** 2, 0);
