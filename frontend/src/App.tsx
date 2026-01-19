@@ -45,6 +45,23 @@ function formatBaseRewardPercent(value: number | null) {
   return formatPercent(value);
 }
 
+function estimateApyBreakdownFromTotal(
+  total: number | null,
+  base: number,
+  reward: number
+) {
+  if (total == null || Number.isNaN(total)) {
+    return { base: null, reward: null };
+  }
+  const currentTotal = base + reward;
+  if (currentTotal <= 0) {
+    return { base: total, reward: 0 };
+  }
+  const baseShare = base / currentTotal;
+  const rewardShare = reward / currentTotal;
+  return { base: total * baseShare, reward: total * rewardShare };
+}
+
 function formatNumber(value: number) {
   return value.toLocaleString("en-US");
 }
@@ -723,7 +740,7 @@ function App() {
 
             <div className="allocation-header">
               <span>Pool</span>
-              <span>Current / Expected APY</span>
+              <span>Current / 30D / Expected APY</span>
               <span>TVL</span>
               <span>Allocation</span>
               <span>Weight</span>
@@ -765,6 +782,11 @@ function App() {
                   const currentApy = includeRewards
                     ? pool.apy
                     : pool.apy_base ?? pool.apy;
+                  const thirtyDayBreakdown = estimateApyBreakdownFromTotal(
+                    pool.apy_30d,
+                    baseCurrent,
+                    rewardCurrent
+                  );
                   const totalTarget =
                     totalAllocated > 0 ? totalAllocated : investment;
                   const allocationPercent =
@@ -802,6 +824,22 @@ function App() {
                           <span className="apy-label">Current</span>
                           <span className="apy-value">
                             {formatPercent(currentApy)}
+                          </span>
+                        </div>
+                        <span className="apy-sep" aria-hidden="true">
+                          |
+                        </span>
+                        <div
+                          className="apy-item"
+                          data-tooltip={`Base: ${formatBaseRewardPercent(
+                            thirtyDayBreakdown.base
+                          )} • Rewards: ${formatBaseRewardPercent(
+                            thirtyDayBreakdown.reward
+                          )}`}
+                        >
+                          <span className="apy-label">30D</span>
+                          <span className="apy-value">
+                            {formatPercent(pool.apy_30d)}
                           </span>
                         </div>
                         <span className="apy-sep" aria-hidden="true">
