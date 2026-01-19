@@ -451,6 +451,10 @@ function App() {
                 selectedPools.map((pool) => {
                   const allocation = allocations[pool.pool_id] || 0;
                   const predicted = predictedApy(pool, allocation);
+                  const allocationPercent =
+                    investment > 0
+                      ? Math.min(100, Math.max(0, (allocation / investment) * 100))
+                      : 0;
                   const weight =
                     totalAllocated > 0
                       ? (allocation / totalAllocated) * 100
@@ -495,26 +499,78 @@ function App() {
                         </div>
                       </div>
                       <div data-role="tvl">{formatCurrency(pool.tvl_usd)}</div>
-                      <div>
+                      <div className="allocation-cell">
                         <input
-                          type="number"
-                          min="0"
-                          step="100"
-                          value={allocation}
+                          type="text"
+                          inputMode="numeric"
+                          value={formatNumber(allocation)}
                           onChange={(event) => {
-                            const value = Number(event.target.value) || 0;
+                            const raw = event.target.value.replace(/[^\d]/g, "");
+                            const value = raw ? Number(raw) : 0;
                             setAllocations((prev) => ({
                               ...prev,
                               [pool.pool_id]: value,
                             }));
                           }}
                         />
+                        <div className="allocation-slider-row">
+                          <div className="allocation-slider-wrap">
+                            <input
+                              className="allocation-slider"
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="1"
+                              value={allocationPercent}
+                              onChange={(event) => {
+                                const percent = Number(event.target.value) || 0;
+                                const value = Math.round(
+                                  (investment * percent) / 100
+                                );
+                                setAllocations((prev) => ({
+                                  ...prev,
+                                  [pool.pool_id]: value,
+                                }));
+                              }}
+                            />
+                            <div className="allocation-ticks" aria-hidden="true">
+                              <span />
+                              <span />
+                              <span />
+                              <span />
+                            </div>
+                            <div className="allocation-tick-labels">
+                              {[25, 50, 75, 100].map((percent) => (
+                                <button
+                                  key={percent}
+                                  type="button"
+                                  className="allocation-tick"
+                                  onClick={() => {
+                                    const value = Math.round(
+                                      (investment * percent) / 100
+                                    );
+                                    setAllocations((prev) => ({
+                                      ...prev,
+                                      [pool.pool_id]: value,
+                                    }));
+                                  }}
+                                >
+                                  {percent}%
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <span className="allocation-percent">
+                            {Math.round(allocationPercent)}%
+                          </span>
+                        </div>
                       </div>
                       <div data-role="weight">{formatPercent(weight, 1)}</div>
                     </div>
                   );
                 })}
             </div>
+
 
             <div className="chart-section">
               <div className="chart-header">
