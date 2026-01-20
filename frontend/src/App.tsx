@@ -66,18 +66,47 @@ function formatNumber(value: number) {
   return value.toLocaleString("en-US");
 }
 
+function baseApyForPool(pool: Pool, includeRewards: boolean) {
+  const fallbackBase = includeRewards ? 0 : pool.apy ?? 0;
+  return pool.apy_base ?? fallbackBase;
+}
+
+function rewardApyForPool(pool: Pool, base: number) {
+  return pool.apy_reward ?? Math.max(0, (pool.apy ?? 0) - base);
+}
+
+function dilutedRewardApy(
+  pool: Pool,
+  allocation: number,
+  includeRewards: boolean
+) {
+  if (!includeRewards) {
+    return 0;
+  }
+  const base = baseApyForPool(pool, includeRewards);
+  const reward = rewardApyForPool(pool, base);
+  if (reward <= 0) {
+    return 0;
+  }
+  const tvl = pool.tvl_usd ?? 0;
+  const slope = pool.apy_tvl_slope ?? 0;
+  let adjustedReward =
+    tvl > 0 && allocation > 0 ? (reward * tvl) / (tvl + allocation) : reward;
+  if (slope !== 0) {
+    adjustedReward += slope * allocation;
+  }
+  return Math.max(0, adjustedReward);
+}
+
 function predictedApy(pool: Pool, allocation: number, includeRewards: boolean) {
   if (pool.apy == null && pool.apy_base == null && pool.apy_reward == null) {
     return null;
   }
-  const fallbackBase = includeRewards ? 0 : pool.apy ?? 0;
-  const slope = pool.apy_tvl_slope ?? 0;
-  const base = pool.apy_base ?? fallbackBase;
+  const base = baseApyForPool(pool, includeRewards);
   if (!includeRewards) {
     return Math.max(0, base);
   }
-  const reward = pool.apy_reward ?? Math.max(0, (pool.apy ?? 0) - base);
-  const predictedReward = Math.max(0, reward + slope * allocation);
+  const predictedReward = dilutedRewardApy(pool, allocation, includeRewards);
   return Math.max(0, base + predictedReward);
 }
 
@@ -86,14 +115,12 @@ function predictedApyBreakdown(
   allocation: number,
   includeRewards: boolean
 ) {
-  const predicted = predictedApy(pool, allocation, includeRewards);
-  if (predicted == null) {
+  if (pool.apy == null && pool.apy_base == null && pool.apy_reward == null) {
     return { base: null, reward: null };
   }
-  const fallbackBase = includeRewards ? 0 : pool.apy ?? 0;
-  const base = pool.apy_base ?? fallbackBase;
-  const reward = includeRewards ? Math.max(0, predicted - base) : 0;
-  return { base, reward };
+  const base = baseApyForPool(pool, includeRewards);
+  const reward = dilutedRewardApy(pool, allocation, includeRewards);
+  return { base: Math.max(0, base), reward };
 }
 
 function describeArc(
