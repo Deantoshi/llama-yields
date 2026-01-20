@@ -1,12 +1,16 @@
 import {
+  CHART_URL,
   DEFAULT_DB,
   PROTOCOLS_URL,
   POOLS_URL,
+  categorizePool,
   fetchJson,
+  ingestHistory,
   initDb,
   listPools,
   normalizeCategory,
   openDb,
+  recomputeMetrics,
   upsertPoolMetricsFromSnapshot,
   upsertPools,
   upsertProtocols,
@@ -49,6 +53,7 @@ Commands:
   ingest-history
   recompute-metrics
   sync
+  sync-top-history
   read
 
 Options:
@@ -56,6 +61,7 @@ Options:
   --category <Stablecoins|ETH|BTC|Other>
   --pool-id <poolId>
   --limit <n>
+  --top <n>
   --window-days <n>
   --verbose
 `);
@@ -168,6 +174,62 @@ async function cmdSync(args) {
   console.log("Sync complete");
 }
 
+async function cmdSyncTopHistory(args) {
+  const data = await fetchJson(POOLS_URL);
+  const pools = Array.isArray(data) ? data : data?.data || [];
+  const protocolData = await fetchJson(PROTOCOLS_URL);
+  const protocols = Array.isArray(protocolData) ? protocolData : [];
+
+  const db = openDb(args.db || DEFAULT_DB);
+  initDb(db);
+  upsertProtocols(db, protocols);
+  upsertPools(db, pools);
+
+  const topN = toInt(args.top, 250);
+  const categories = ["Stablecoins", "ETH", "BTC", "Other"];
+  const buckets = new Map(categories.map((cat) => [cat, []]));
+
+  for (const pool of pools) {
+    const category = categorizePool(pool?.symbol || "", pool?.stablecoin ?? null);
+    const tvlUsd = pool?.tvlUsd ?? 0;
+    if (!buckets.has(category)) {
+      buckets.set(category, []);
+    }
+    buckets.get(category).push({ id: pool?.pool, tvlUsd });
+  }
+
+  const poolIds = [];
+  for (const category of categories) {
+    const items = buckets.get(category) || [];
+    items.sort((a, b) => b.tvlUsd - a.tvlUsd);
+    for (const item of items.slice(0, topN)) {
+      if (item.id) {
+        poolIds.push(item.id);
+      }
+    }
+  }
+
+  const delayMs = 1500;
+  for (let i = 0; i < poolIds.length; i += 1) {
+    const pid = poolIds[i];
+    const chart = await fetchJson(CHART_URL.replace("{}", pid));
+    const chartData = Array.isArray(chart) ? chart : chart?.data || [];
+    ingestHistory(db, pid, chartData);
+    if (args.verbose) {
+      console.log(`[${i + 1}/${poolIds.length}] Ingested history for ${pid}`);
+    }
+    if (i < poolIds.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  recomputeMetrics(db, {
+    windowDays: toInt(args["window-days"], 90),
+  });
+  db.close();
+  console.log("Top history sync complete");
+}
+
 async function cmdRead(args) {
   const db = openDb(args.db || DEFAULT_DB);
   initDb(db);
@@ -204,6 +266,9 @@ async function main() {
       break;
     case "sync":
       await cmdSync(args);
+      break;
+    case "sync-top-history":
+      await cmdSyncTopHistory(args);
       break;
     case "read":
       await cmdRead(args);
