@@ -52,6 +52,26 @@ export function splitSymbol(symbol) {
   return rawTokens.map(normalizeToken).filter(Boolean);
 }
 
+function isSingleAsset(underlyingTokensJson, symbol) {
+  if (underlyingTokensJson) {
+    try {
+      const tokens = JSON.parse(underlyingTokensJson);
+      if (Array.isArray(tokens) && tokens.length > 0) {
+        return tokens.length === 1;
+      }
+    } catch {
+      // Fall back to symbol parsing when underlying tokens are invalid JSON.
+    }
+  }
+  return splitSymbol(symbol).length === 1;
+}
+
+function filterSingleAssetRows(rows) {
+  return rows
+    .filter((row) => isSingleAsset(row.underlying_tokens, row.symbol))
+    .map(({ underlying_tokens, ...rest }) => rest);
+}
+
 export function categorizePool(symbol, stablecoinFlag = null) {
   const tokens = splitSymbol(symbol);
   if (!tokens.length) {
@@ -505,6 +525,7 @@ export function recomputeMetrics(db, { poolId = null, windowDays = 90 } = {}) {
 export function listPools(db, category, limit) {
   const rows = db.prepare(`
     SELECT p.pool_id, p.project, p.chain, p.symbol, p.url, p.category,
+           p.underlying_tokens,
            m.tvl_usd, m.apy, m.apy_base, m.apy_reward, m.apy_30d,
            m.apy_tvl_slope, m.sample_count,
            pr.url AS protocol_url, pr.logo AS protocol_logo
@@ -516,13 +537,14 @@ export function listPools(db, category, limit) {
     LIMIT ?
   `).all(category, limit);
 
-  return rows;
+  return filterSingleAssetRows(rows);
 }
 
 export function searchPools(db, query, limit) {
   const term = `%${query.toLowerCase()}%`;
   const rows = db.prepare(`
     SELECT p.pool_id, p.project, p.chain, p.symbol, p.url, p.category,
+           p.underlying_tokens,
            m.tvl_usd, m.apy, m.apy_base, m.apy_reward, m.apy_30d,
            m.apy_tvl_slope, m.sample_count,
            pr.url AS protocol_url, pr.logo AS protocol_logo
@@ -536,5 +558,5 @@ export function searchPools(db, query, limit) {
     LIMIT ?
   `).all(term, term, term, limit);
 
-  return rows;
+  return filterSingleAssetRows(rows);
 }

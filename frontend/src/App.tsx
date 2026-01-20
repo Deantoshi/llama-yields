@@ -138,7 +138,7 @@ function App() {
   );
   const [tvlMin, setTvlMin] = useState(1000000);
   const [tvlMinDisplay, setTvlMinDisplay] = useState(formatNumber(1000000));
-  const [splits, setSplits] = useState(6);
+  const [splits, setSplits] = useState(5);
   const [includeRewards, setIncludeRewards] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
