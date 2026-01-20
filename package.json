@@ -1,0 +1,8 @@
+{
+  "name": "llama-yields",
+  "private": true,
+  "scripts": {
+    "gcp-build": "npm --prefix frontend ci && npm --prefix frontend run build && npm --prefix backend ci",
+    "start": "node backend/src/server.js --host 0.0.0.0 --port $PORT --web frontend/dist --db /tmp/llama.sqlite"
+  }
+}

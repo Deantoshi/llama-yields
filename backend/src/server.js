@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
@@ -21,6 +22,7 @@ const ROOT_DIR = path.resolve(
 );
 const DEFAULT_WEB_DIR = path.join(ROOT_DIR, "frontend", "dist");
 const FRONTEND_ROOT = path.join(ROOT_DIR, "frontend");
+const DEFAULT_TMP_DB = path.join(os.tmpdir(), "llama.sqlite");
 
 function parseArgs(argv) {
   const result = {};
@@ -42,12 +44,51 @@ function parseArgs(argv) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-const dbPath = args.db || DEFAULT_DB;
-const host = args.host || DEFAULT_HOST;
-const port = Number.parseInt(args.port || String(DEFAULT_PORT), 10);
+const dbPath =
+  args.db || process.env.DB_PATH || (process.env.NODE_ENV === "production"
+    ? DEFAULT_TMP_DB
+    : DEFAULT_DB);
+const host =
+  args.host ||
+  process.env.HOST ||
+  (process.env.NODE_ENV === "production" ? "0.0.0.0" : DEFAULT_HOST);
+const port = Number.parseInt(
+  args.port || process.env.PORT || String(DEFAULT_PORT),
+  10
+);
 const webDir = path.resolve(args.web || DEFAULT_WEB_DIR);
 const isDev = Boolean(args.dev) || process.env.NODE_ENV === "development";
 
+async function copyDbIfNeeded() {
+  if (dbPath !== DEFAULT_TMP_DB) {
+    return;
+  }
+  const sourceDb = DEFAULT_DB;
+  try {
+    await fs.access(sourceDb);
+  } catch {
+    return;
+  }
+  try {
+    await fs.access(dbPath);
+    return;
+  } catch {
+    // Continue to copy seed DB.
+  }
+  await fs.copyFile(sourceDb, dbPath);
+  for (const suffix of ["-wal", "-shm"]) {
+    const src = `${sourceDb}${suffix}`;
+    const dest = `${dbPath}${suffix}`;
+    try {
+      await fs.access(src);
+      await fs.copyFile(src, dest);
+    } catch {
+      // Ignore missing WAL/SHM files.
+    }
+  }
+}
+
+await copyDbIfNeeded();
 const db = openDb(dbPath);
 initDb(db);
 
