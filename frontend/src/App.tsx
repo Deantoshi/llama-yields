@@ -136,6 +136,8 @@ function App() {
   const [investmentDisplay, setInvestmentDisplay] = useState(
     formatNumber(100000)
   );
+  const [tvlMin, setTvlMin] = useState(1000000);
+  const [tvlMinDisplay, setTvlMinDisplay] = useState(formatNumber(1000000));
   const [splits, setSplits] = useState(6);
   const [includeRewards, setIncludeRewards] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -287,17 +289,21 @@ function App() {
 
   const recomputeSelection = useCallback(() => {
     if (!pools.length) {
-      setSelectedPools(manualPools);
-      const allocation = investment / Math.max(1, manualPools.length);
+      const filteredManualPools = manualPools.filter(
+        (pool) => (pool.tvl_usd ?? 0) >= tvlMin
+      );
+      setSelectedPools(filteredManualPools);
+      const allocation = investment / Math.max(1, filteredManualPools.length);
       const nextAllocations: Record<string, number> = {};
-      manualPools.forEach((pool) => {
+      filteredManualPools.forEach((pool) => {
         nextAllocations[pool.pool_id] = allocation;
       });
       setAllocations(nextAllocations);
       return;
     }
     const filteredManualPools = manualPools.filter(
-      (pool) => !removedPoolSet.has(pool.pool_id)
+      (pool) =>
+        !removedPoolSet.has(pool.pool_id) && (pool.tvl_usd ?? 0) >= tvlMin
     );
     const manualIds = new Set(
       filteredManualPools.map((pool) => pool.pool_id)
@@ -307,7 +313,9 @@ function App() {
     const scored = pools
       .filter(
         (pool) =>
-          !removedPoolSet.has(pool.pool_id) && !manualIds.has(pool.pool_id)
+          !removedPoolSet.has(pool.pool_id) &&
+          !manualIds.has(pool.pool_id) &&
+          (pool.tvl_usd ?? 0) >= tvlMin
       )
       .map((pool) => ({
         pool,
@@ -328,7 +336,15 @@ function App() {
       nextAllocations[pool.pool_id] = allocation;
     });
     setAllocations(nextAllocations);
-  }, [investment, pools, removedPoolSet, splits, includeRewards, manualPools]);
+  }, [
+    investment,
+    pools,
+    removedPoolSet,
+    splits,
+    includeRewards,
+    manualPools,
+    tvlMin,
+  ]);
 
   const autoAllocate = useCallback(() => {
     const allocation = investment / Math.max(1, selectedPools.length);
@@ -434,17 +450,27 @@ function App() {
 
   useEffect(() => {
     if (!pools.length) {
-      setSelectedPools(manualPools);
-      const allocation = investment / Math.max(1, manualPools.length);
+      const filteredManualPools = manualPools.filter(
+        (pool) => (pool.tvl_usd ?? 0) >= tvlMin
+      );
+      setSelectedPools(filteredManualPools);
+      const allocation = investment / Math.max(1, filteredManualPools.length);
       const nextAllocations: Record<string, number> = {};
-      manualPools.forEach((pool) => {
+      filteredManualPools.forEach((pool) => {
         nextAllocations[pool.pool_id] = allocation;
       });
       setAllocations(nextAllocations);
       return;
     }
     recomputeSelection();
-  }, [pools, recomputeSelection, investment, manualPools]);
+  }, [pools, recomputeSelection, investment, manualPools, tvlMin]);
+
+  const filteredSearchResults = useMemo(() => {
+    if (!searchResults.length) {
+      return [];
+    }
+    return searchResults.filter((pool) => (pool.tvl_usd ?? 0) >= tvlMin);
+  }, [searchResults, tvlMin]);
 
   const totalAllocated = useMemo(() => {
     return Object.values(allocations).reduce((sum, value) => sum + value, 0);
@@ -780,6 +806,29 @@ function App() {
                 />
               </label>
               <label className="control">
+                <span>Minimum TVL (USD)</span>
+                <input
+                  id="tvl-min"
+                  type="text"
+                  inputMode="numeric"
+                  value={tvlMinDisplay}
+                  onChange={(event) => {
+                    const raw = event.target.value.replace(/[^\d]/g, "");
+                    if (!raw) {
+                      setTvlMin(0);
+                      setTvlMinDisplay("");
+                      return;
+                    }
+                    const nextValue = Number(raw);
+                    setTvlMin(nextValue);
+                    setTvlMinDisplay(formatNumber(nextValue));
+                  }}
+                  onBlur={() => {
+                    setTvlMinDisplay(formatNumber(tvlMin));
+                  }}
+                />
+              </label>
+              <label className="control">
                 <span>Split count</span>
                 <input
                   id="split-count"
@@ -878,7 +927,7 @@ function App() {
                       {searchTerm.trim().length >= 2 &&
                         !searchLoading &&
                         !searchError &&
-                        searchResults.length === 0 && (
+                        filteredSearchResults.length === 0 && (
                           <div className="search-result is-empty">
                             No matching pools found.
                           </div>
@@ -886,7 +935,7 @@ function App() {
                       {searchTerm.trim().length >= 2 &&
                         !searchLoading &&
                         !searchError &&
-                        searchResults.map((pool) => {
+                        filteredSearchResults.map((pool) => {
                           const isSelected = selectedPools.some(
                             (item) => item.pool_id === pool.pool_id
                           );
@@ -930,8 +979,8 @@ function App() {
                 </div>
               </label>
               <span className="allocation-search-meta">
-                {searchResults.length
-                  ? `${searchResults.length} results`
+                {filteredSearchResults.length
+                  ? `${filteredSearchResults.length} results`
                   : `${selectedPools.length} pools in table`}
               </span>
             </div>
