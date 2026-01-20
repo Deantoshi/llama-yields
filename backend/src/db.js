@@ -56,27 +56,33 @@ export function splitSymbol(symbol) {
   return rawTokens.map(normalizeToken).filter(Boolean);
 }
 
-export function categorizePool(symbol) {
+export function categorizePool(symbol, stablecoinFlag = null) {
   const tokens = splitSymbol(symbol);
   if (!tokens.length) {
     return "Other";
   }
 
-  const stableLike = [];
-  for (const tok of tokens) {
-    if (STABLE_TOKENS.has(tok) || tok.endsWith("USD") || tok.endsWith("EUR")) {
-      stableLike.push(tok);
-      continue;
-    }
-    for (const prefix of STABLE_PREFIXES) {
-      if (tok.startsWith(prefix)) {
+  if (stablecoinFlag === true) {
+    return "Stablecoins";
+  }
+
+  if (stablecoinFlag !== false) {
+    const stableLike = [];
+    for (const tok of tokens) {
+      if (STABLE_TOKENS.has(tok) || tok.endsWith("USD") || tok.endsWith("EUR")) {
         stableLike.push(tok);
-        break;
+        continue;
+      }
+      for (const prefix of STABLE_PREFIXES) {
+        if (tok.startsWith(prefix)) {
+          stableLike.push(tok);
+          break;
+        }
       }
     }
-  }
-  if (stableLike.length && stableLike.length === tokens.length) {
-    return "Stablecoins";
+    if (stableLike.length && stableLike.length === tokens.length) {
+      return "Stablecoins";
+    }
   }
   if (tokens.some((tok) => BTC_TOKENS.has(tok) || tok.includes("BTC"))) {
     return "BTC";
@@ -246,7 +252,7 @@ export function upsertPools(db, pools) {
       pool?.url || null,
       pool?.underlyingTokens != null ? JSON.stringify(pool.underlyingTokens) : null,
       pool?.rewardTokens != null ? JSON.stringify(pool.rewardTokens) : null,
-      categorizePool(symbol),
+      categorizePool(symbol, pool?.stablecoin ?? null),
       now,
       now,
     ]);
