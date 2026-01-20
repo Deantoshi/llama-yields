@@ -849,7 +849,7 @@ function App() {
                   <input
                     type="search"
                     value={searchTerm}
-                    placeholder="Search by protocol or symbol (e.g. Maple, USDC)"
+                    placeholder="Search app or symbol"
                     onChange={(event) => setSearchTerm(event.target.value)}
                     aria-label="Search pools by protocol or symbol"
                   />
