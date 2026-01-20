@@ -19,10 +19,6 @@ const STABLE_TOKENS = new Set([
   "GUSD", "LUSD", "MIM", "USDD", "SUSD", "EUR", "EURO", "USDBC", "PYUSD",
   "SFRAX", "CRVUSD", "GHO", "FDUSD", "USTC", "USDD",
 ]);
-const STABLE_PREFIXES = new Set([
-  "USD", "USDC", "USDT", "USDS", "USDE", "USDP", "USDD", "USDBC", "EUR",
-  "DAI", "FRAX", "PYUSD",
-]);
 const ETH_TOKENS = new Set([
   "ETH", "WETH", "STETH", "WSTETH", "RETH", "FRXETH", "SFRXETH", "CBETH",
   "WEETH", "EZETH", "OETH", "OSETH", "METH", "SETH", "ETHX",
@@ -62,27 +58,9 @@ export function categorizePool(symbol, stablecoinFlag = null) {
     return "Other";
   }
 
-  if (stablecoinFlag === true) {
+  const stableLike = tokens.filter((tok) => STABLE_TOKENS.has(tok));
+  if (stableLike.length && stableLike.length === tokens.length) {
     return "Stablecoins";
-  }
-
-  if (stablecoinFlag !== false) {
-    const stableLike = [];
-    for (const tok of tokens) {
-      if (STABLE_TOKENS.has(tok) || tok.endsWith("USD") || tok.endsWith("EUR")) {
-        stableLike.push(tok);
-        continue;
-      }
-      for (const prefix of STABLE_PREFIXES) {
-        if (tok.startsWith(prefix)) {
-          stableLike.push(tok);
-          break;
-        }
-      }
-    }
-    if (stableLike.length && stableLike.length === tokens.length) {
-      return "Stablecoins";
-    }
   }
   if (tokens.some((tok) => BTC_TOKENS.has(tok) || tok.includes("BTC"))) {
     return "BTC";
