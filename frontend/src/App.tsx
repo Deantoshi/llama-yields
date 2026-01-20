@@ -803,11 +803,6 @@ function App() {
                   >
                     {includeRewards ? "Rewards on" : "Rewards off"}
                   </button>
-                </div>
-              </div>
-              <div className="control">
-                <span>Allocation tools</span>
-                <div className="control-actions">
                   <button className="ghost" onClick={autoAllocate}>
                     Auto-allocate
                   </button>
