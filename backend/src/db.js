@@ -284,6 +284,73 @@ export function upsertPools(db, pools) {
   transaction(rows);
 }
 
+export function upsertPoolMetricsFromSnapshot(
+  db,
+  pools,
+  { windowDays = 30 } = {}
+) {
+  const now = Math.floor(Date.now() / 1000);
+  const rows = [];
+
+  for (const pool of pools) {
+    const poolId = pool?.pool;
+    if (!poolId) {
+      continue;
+    }
+    const tvlUsd = pool?.tvlUsd ?? null;
+    const apy30d =
+      pool?.apyPct30D ??
+      pool?.apyPct30d ??
+      pool?.apy30d ??
+      null;
+    const hasSample = tvlUsd != null ? 1 : 0;
+
+    rows.push([
+      poolId,
+      now,
+      tvlUsd,
+      pool?.apy ?? null,
+      pool?.apyBase ?? null,
+      pool?.apyReward ?? null,
+      apy30d,
+      0,
+      hasSample,
+      tvlUsd,
+      tvlUsd,
+      windowDays,
+      now,
+    ]);
+  }
+
+  const stmt = db.prepare(`
+    INSERT INTO pool_metrics (
+      pool_id, last_ts, tvl_usd, apy, apy_base, apy_reward, apy_30d,
+      apy_tvl_slope, sample_count, tvl_min, tvl_max, model_window_days, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(pool_id) DO UPDATE SET
+      last_ts=excluded.last_ts,
+      tvl_usd=excluded.tvl_usd,
+      apy=excluded.apy,
+      apy_base=excluded.apy_base,
+      apy_reward=excluded.apy_reward,
+      apy_30d=excluded.apy_30d,
+      apy_tvl_slope=excluded.apy_tvl_slope,
+      sample_count=excluded.sample_count,
+      tvl_min=excluded.tvl_min,
+      tvl_max=excluded.tvl_max,
+      model_window_days=excluded.model_window_days,
+      updated_at=excluded.updated_at
+  `);
+
+  const transaction = db.transaction((items) => {
+    for (const row of items) {
+      stmt.run(...row);
+    }
+  });
+
+  transaction(rows);
+}
+
 export function computeRolling30d(rows) {
   const window = [];
   let head = 0;

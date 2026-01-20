@@ -1,15 +1,13 @@
 import {
-  CHART_URL,
   DEFAULT_DB,
   PROTOCOLS_URL,
   POOLS_URL,
   fetchJson,
-  ingestHistory,
   initDb,
   listPools,
   normalizeCategory,
   openDb,
-  recomputeMetrics,
+  upsertPoolMetricsFromSnapshot,
   upsertPools,
   upsertProtocols,
 } from "./db.js";
@@ -147,36 +145,24 @@ async function cmdSync(args) {
   upsertPools(db, pools);
 
   const category = normalizeCategory(args.category);
-  let poolIds = [];
+  let filteredPools = pools;
   if (category) {
-    poolIds = db
-      .prepare("SELECT pool_id FROM pools WHERE category = ?")
-      .all(category)
-      .map((row) => row.pool_id);
-  } else {
-    poolIds = db
-      .prepare("SELECT pool_id FROM pools")
-      .all()
-      .map((row) => row.pool_id);
+    const poolIds = new Set(
+      db
+        .prepare("SELECT pool_id FROM pools WHERE category = ?")
+        .all(category)
+        .map((row) => row.pool_id)
+    );
+    filteredPools = pools.filter((pool) => poolIds.has(pool?.pool));
   }
 
   const limit = toInt(args.limit, null);
   if (limit) {
-    poolIds = poolIds.slice(0, limit);
+    filteredPools = filteredPools.slice(0, limit);
   }
 
-  for (let i = 0; i < poolIds.length; i += 1) {
-    const pid = poolIds[i];
-    const chart = await fetchJson(CHART_URL.replace("{}", pid));
-    const chartData = Array.isArray(chart) ? chart : chart?.data || [];
-    ingestHistory(db, pid, chartData);
-    if (args.verbose) {
-      console.log(`[${i + 1}/${poolIds.length}] Ingested history for ${pid}`);
-    }
-  }
-
-  recomputeMetrics(db, {
-    windowDays: toInt(args["window-days"], 90),
+  upsertPoolMetricsFromSnapshot(db, filteredPools, {
+    windowDays: toInt(args["window-days"], 30),
   });
   db.close();
   console.log("Sync complete");
