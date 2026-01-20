@@ -3,15 +3,16 @@ import type { Pool } from "./types";
 
 const CATEGORIES = ["Stablecoins", "ETH", "BTC"] as const;
 const PIE_COLORS = [
-  "#ff8f3d",
-  "#2ab3a6",
-  "#f1c453",
-  "#e4572e",
-  "#59c3c3",
-  "#f3d34a",
-  "#f79d65",
-  "#7bdff2",
-  "#fbb13c",
+  "#1f67d2",
+  "#445ed0",
+  "#344179",
+  "#C99A4A",
+  "#996F1F",
+  "#FDE0A9",
+  "#FBEDCB",
+  "#7c7c7c",
+  "#848585",
+  "#e6e6e6",
 ];
 
 type Category = (typeof CATEGORIES)[number];
@@ -774,7 +775,7 @@ function App() {
           </div>
           <div className="hero-metric">
             <span className="metric-label">Model</span>
-            <span className="metric-value">TVL elasticity</span>
+            <span className="metric-value">Reward APY elasticity</span>
           </div>
           <div className="hero-metric">
             <span className="metric-label">Planner</span>
@@ -1364,7 +1365,7 @@ function App() {
 
       <footer className="footer">
         <span>Powered by DefiLlama API data.</span>
-        <span>Model uses a linear APY vs TVL elasticity on recent history.</span>
+        <span>APY dilution only applied to Rewards APY.</span>
       </footer>
     </div>
   );
